@@ -3,9 +3,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import AppNavbar from "@/components/AppNavbar";
 
-
-
-
 type LeaderboardPlayer = {
   id: number;
   displayName: string;
@@ -19,7 +16,6 @@ type LeaderboardRow = {
   totalPoints: number;
   predictionCount: number;
 };
-
 
 export default async function LeaderboardPage() {
   const user = await getCurrentUser();
@@ -59,7 +55,10 @@ export default async function LeaderboardPage() {
         predictionCount: player.predictions.length,
       };
     })
-    .sort((a: LeaderboardRow, b: LeaderboardRow) => b.totalPoints - a.totalPoints);
+    .sort(
+      (a: LeaderboardRow, b: LeaderboardRow) =>
+        b.totalPoints - a.totalPoints
+    );
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-6 text-white">
@@ -82,17 +81,32 @@ export default async function LeaderboardPage() {
               </thead>
 
               <tbody>
-                {leaderboard.map((player, index) => (
-                  <tr key={player.id} className="border-t border-white/10">
-                    <td className="p-4 font-black">#{index + 1}</td>
-                    <td className="p-4 font-bold">{player.displayName}</td>
-                    <td className="p-4 text-xl font-black text-green-300">
-                      {player.totalPoints}
-                    </td>
-                    <td className="p-4">{player.predictionCount}/104</td>
-                    <td className="p-4">{104 - player.predictionCount}</td>
-                  </tr>
-                ))}
+                {leaderboard.map(
+                  (player: LeaderboardRow, index: number) => (
+                    <tr
+                      key={player.id}
+                      className="border-t border-white/10"
+                    >
+                      <td className="p-4 font-black">#{index + 1}</td>
+
+                      <td className="p-4 font-bold">
+                        {player.displayName}
+                      </td>
+
+                      <td className="p-4 text-xl font-black text-green-300">
+                        {player.totalPoints}
+                      </td>
+
+                      <td className="p-4">
+                        {player.predictionCount}/104
+                      </td>
+
+                      <td className="p-4">
+                        {104 - player.predictionCount}
+                      </td>
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>
