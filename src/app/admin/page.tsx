@@ -1,61 +1,82 @@
-export default function AdminPage() {
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
+import AppNavbar from "@/components/AppNavbar";
+
+export default async function AdminPage() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  if (user.role !== "ADMIN") {
+    redirect("/dashboard");
+  }
+
   return (
-    <main className="min-h-screen bg-slate-100 px-6 py-10">
-      <div className="mx-auto max-w-5xl">
-        <h1 className="mb-2 text-4xl font-bold text-slate-900">
-          Admin Panel
-        </h1>
+    <main className="min-h-screen bg-slate-950 px-4 py-6 text-white">
+      <div className="mx-auto max-w-6xl">
+        <AppNavbar name={user.displayName} role={user.role} />
 
-        <p className="mb-8 text-slate-600">
-          Admins can update real match results and calculate player points.
-        </p>
+        <section className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-xl">
+          <h1 className="mb-2 text-4xl font-black text-white">
+            Admin Panel
+          </h1>
 
-        <div className="rounded-2xl bg-white p-6 shadow">
-          <h2 className="mb-4 text-2xl font-bold text-slate-900">
-            Update Match Result
-          </h2>
+          <p className="mb-8 text-white/60">
+            Admins can update real match results and calculate player points.
+          </p>
 
-          <form className="grid gap-4 md:grid-cols-4">
-            <div>
-              <label className="mb-1 block font-medium text-slate-700">
-                Match Number
-              </label>
-              <input
-                type="number"
-                className="w-full rounded-lg border border-slate-300 px-4 py-2"
-              />
-            </div>
+          <div className="rounded-2xl bg-black/30 p-6">
+            <h2 className="mb-4 text-2xl font-black text-white">
+              Update Match Result
+            </h2>
 
-            <div>
-              <label className="mb-1 block font-medium text-slate-700">
-                Team 1 Score
-              </label>
-              <input
-                type="number"
-                className="w-full rounded-lg border border-slate-300 px-4 py-2"
-              />
-            </div>
+            <form className="grid gap-4 md:grid-cols-4">
+              <div>
+                <label className="mb-1 block font-medium text-white/70">
+                  Match Number
+                </label>
 
-            <div>
-              <label className="mb-1 block font-medium text-slate-700">
-                Team 2 Score
-              </label>
-              <input
-                type="number"
-                className="w-full rounded-lg border border-slate-300 px-4 py-2"
-              />
-            </div>
+                <input
+                  type="number"
+                  className="w-full rounded-lg border border-white/10 bg-white/10 px-4 py-2 text-white outline-none"
+                />
+              </div>
 
-            <div className="flex items-end">
-              <button
-                type="button"
-                className="w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
-              >
-                Save Result
-              </button>
-            </div>
-          </form>
-        </div>
+              <div>
+                <label className="mb-1 block font-medium text-white/70">
+                  Team 1 Score
+                </label>
+
+                <input
+                  type="number"
+                  className="w-full rounded-lg border border-white/10 bg-white/10 px-4 py-2 text-white outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block font-medium text-white/70">
+                  Team 2 Score
+                </label>
+
+                <input
+                  type="number"
+                  className="w-full rounded-lg border border-white/10 bg-white/10 px-4 py-2 text-white outline-none"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  className="w-full rounded-lg bg-green-400 px-4 py-2 font-black text-slate-950 hover:bg-green-300"
+                >
+                  Save Result
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
       </div>
     </main>
   );
