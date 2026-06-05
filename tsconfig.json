@@ -32,6 +32,6 @@
   ],
   "exclude": [
   "node_modules",
-  "prisma/importMatches.ts"
+  "prisma/*.ts" 
 ]
 }
