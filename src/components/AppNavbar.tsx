@@ -21,38 +21,38 @@ export default function AppNavbar({ name, role }: AppNavbarProps) {
   }
 
   return (
-    <header className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-4 shadow-xl">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-black text-white">
+    <header className="mb-6 rounded-2xl border border-white/10 bg-white/10 p-3 shadow-xl sm:rounded-3xl sm:p-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-black text-white sm:text-xl">
             World Cup Prediction
           </h1>
 
-          <p className="text-sm text-white/60">
+          <p className="mt-1 truncate text-xs text-white/60 sm:text-sm">
             Logged in as {name}
           </p>
         </div>
 
-        <nav className="flex flex-wrap gap-2">
+        <nav className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
           {role !== "ADMIN" && (
             <>
               <Link
                 href="/dashboard"
-                className="rounded-xl bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20"
+                className="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold text-white hover:bg-white/20 sm:flex-none sm:px-4 sm:text-sm"
               >
                 Portal
               </Link>
 
               <Link
                 href="/matches"
-                className="rounded-xl bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20"
+                className="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold text-white hover:bg-white/20 sm:flex-none sm:px-4 sm:text-sm"
               >
                 Matches
               </Link>
 
               <Link
                 href="/leaderboard"
-                className="rounded-xl bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20"
+                className="flex-1 rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold text-white hover:bg-white/20 sm:flex-none sm:px-4 sm:text-sm"
               >
                 Leaderboard
               </Link>
@@ -61,7 +61,7 @@ export default function AppNavbar({ name, role }: AppNavbarProps) {
 
           <button
             onClick={logout}
-            className="rounded-xl bg-red-500/80 px-4 py-2 text-sm font-bold text-white hover:bg-red-500"
+            className="w-full rounded-xl bg-red-500/80 px-3 py-2 text-xs font-bold text-white hover:bg-red-500 sm:w-auto sm:px-4 sm:text-sm"
           >
             Logout
           </button>
