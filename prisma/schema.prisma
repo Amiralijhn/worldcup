@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  PLAYER
+}
+
+enum MatchStatus {
+  UPCOMING
+  LIVE
+  FINISHED
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  displayName  String
+  role         UserRole @default(PLAYER)
+  createdAt    DateTime @default(now())
+
+  predictions      Prediction[]
+  scoreAdjustments ScoreAdjustment[] @relation("UserAdjustments")
+  adminAdjustments ScoreAdjustment[] @relation("AdminAdjustments")
+}
+
+model Match {
+  id               Int         @id @default(autoincrement())
+  matchNumber      Int         @unique
+  team1            String
+  team2            String
+  stage            String      @default("Group Stage")
+  kickoffAt        DateTime
+  actualTeam1Score Int?
+  actualTeam2Score Int?
+  status           MatchStatus @default(UPCOMING)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  predictions Prediction[]
+}
+
+model Prediction {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  matchId        Int
+  predTeam1Score Int
+  predTeam2Score Int
+  points         Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId])
+}
+
+model ScoreAdjustment {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  adminId      Int
+  pointsChange Int
+  reason       String
+  createdAt    DateTime @default(now())
+
+  user  User @relation("UserAdjustments", fields: [userId], references: [id], onDelete: Cascade)
+  admin User @relation("AdminAdjustments", fields: [adminId], references: [id], onDelete: Cascade)
+}
