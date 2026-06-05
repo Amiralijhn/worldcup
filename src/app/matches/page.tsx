@@ -4,6 +4,23 @@ import { prisma } from "@/lib/prisma";
 import AppNavbar from "@/components/AppNavbar";
 import MatchesClient from "@/components/MatchesClient";
 
+type MatchWithPrediction = {
+  id: number;
+  matchNumber: number;
+  team1: string;
+  team2: string;
+  stage: string;
+  kickoffAt: Date;
+  actualTeam1Score: number | null;
+  actualTeam2Score: number | null;
+  status: string;
+  predictions: {
+    predTeam1Score: number;
+    predTeam2Score: number;
+    points: number | null;
+  }[];
+};
+
 export default async function MatchesPage() {
   const user = await getCurrentUser();
 
@@ -24,7 +41,7 @@ export default async function MatchesPage() {
     },
   });
 
-  const formattedMatches = matches.map((match) => ({
+  const formattedMatches = matches.map((match: MatchWithPrediction) => ({
     id: match.id,
     matchNumber: match.matchNumber,
     team1: match.team1,
