@@ -28,14 +28,14 @@ export default async function DashboardPage() {
   }
 
   const predictionPoints = currentUser.predictions.reduce(
-    (sum, prediction) => sum + (prediction.points || 0),
-    0
-  );
+  (sum: number, prediction) => sum + (prediction.points || 0),
+  0
+);
 
-  const adjustmentPoints = currentUser.scoreAdjustments.reduce(
-    (sum, adjustment) => sum + adjustment.pointsChange,
-    0
-  );
+const adjustmentPoints = currentUser.scoreAdjustments.reduce(
+  (sum: number, adjustment) => sum + adjustment.pointsChange,
+  0
+);
 
   const totalScore = predictionPoints + adjustmentPoints;
 

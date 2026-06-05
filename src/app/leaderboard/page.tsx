@@ -24,14 +24,14 @@ export default async function LeaderboardPage() {
   const leaderboard = players
     .map((player) => {
       const predictionPoints = player.predictions.reduce(
-        (sum, prediction) => sum + (prediction.points || 0),
-        0
-      );
+  (sum: number, prediction) => sum + (prediction.points || 0),
+  0
+);
 
       const adjustmentPoints = player.scoreAdjustments.reduce(
-        (sum, adjustment) => sum + adjustment.pointsChange,
-        0
-      );
+  (sum: number, adjustment) => sum + adjustment.pointsChange,
+  0
+);
 
       return {
         id: player.id,
