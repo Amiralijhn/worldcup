@@ -4,6 +4,15 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "World Cup Prediction",
   description: "World Cup 2026 prediction website",
+  icons: {
+    icon: "/apple-touch-icon.png",
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "WorldCupPredictions",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export default function RootLayout({
