@@ -3,12 +3,23 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import AppNavbar from "@/components/AppNavbar";
 
+
+
+
 type LeaderboardPlayer = {
   id: number;
   displayName: string;
   predictions: { points: number | null }[];
   scoreAdjustments: { pointsChange: number }[];
 };
+
+type LeaderboardRow = {
+  id: number;
+  displayName: string;
+  totalPoints: number;
+  predictionCount: number;
+};
+
 
 export default async function LeaderboardPage() {
   const user = await getCurrentUser();
@@ -48,7 +59,7 @@ export default async function LeaderboardPage() {
         predictionCount: player.predictions.length,
       };
     })
-    .sort((a, b) => b.totalPoints - a.totalPoints);
+    .sort((a: LeaderboardRow, b: LeaderboardRow) => b.totalPoints - a.totalPoints);
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-6 text-white">
