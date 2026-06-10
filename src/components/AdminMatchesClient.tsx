@@ -40,6 +40,14 @@ type TimeFilter =
   | "previous"
   | "all";
 
+type PredictionRowProps = {
+  prediction: AdminPrediction;
+  onSave: (
+    predictionId: number,
+    points: number
+  ) => Promise<void>;
+};
+
 const stages = [
   "All",
   "Group Stage",
@@ -52,19 +60,64 @@ const stages = [
   "Final",
 ];
 
-function getTorontoDateKey(date: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
+function getTorontoDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Toronto",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(date);
+  }).formatToParts(date);
+
+  return {
+    year: Number(
+      parts.find((part) => part.type === "year")?.value
+    ),
+    month: Number(
+      parts.find((part) => part.type === "month")?.value
+    ),
+    day: Number(
+      parts.find((part) => part.type === "day")?.value
+    ),
+  };
 }
 
-function addDays(date: Date, numberOfDays: number) {
-  const result = new Date(date);
-  result.setDate(result.getDate() + numberOfDays);
-  return result;
+function getTorontoDateKey(date: Date) {
+  const { year, month, day } = getTorontoDateParts(date);
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(
+    day
+  ).padStart(2, "0")}`;
+}
+
+function addDaysToTorontoDateKey(
+  date: Date,
+  numberOfDays: number
+) {
+  const { year, month, day } = getTorontoDateParts(date);
+
+  const result = new Date(
+    Date.UTC(year, month - 1, day + numberOfDays)
+  );
+
+  return result.toISOString().slice(0, 10);
+}
+
+function getEndOfWeekDateKey(date: Date) {
+  const { year, month, day } = getTorontoDateParts(date);
+
+  const temporaryDate = new Date(
+    Date.UTC(year, month - 1, day)
+  );
+
+  const dayOfWeek = temporaryDate.getUTCDay();
+  const daysUntilSunday =
+    dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+
+  temporaryDate.setUTCDate(
+    temporaryDate.getUTCDate() + daysUntilSunday
+  );
+
+  return temporaryDate.toISOString().slice(0, 10);
 }
 
 function formatKickoff(value: string) {
@@ -92,16 +145,20 @@ export default function AdminMatchesClient({
   const [stageFilter, setStageFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<
+    "success" | "error"
+  >("success");
 
   const filteredMatches = useMemo(() => {
     const now = new Date();
+
     const next24Hours = new Date(
       now.getTime() + 24 * 60 * 60 * 1000
     );
 
     const todayKey = getTorontoDateKey(now);
-    const tomorrowKey = getTorontoDateKey(addDays(now, 1));
-    const weekEnd = addDays(now, 7);
+    const tomorrowKey = addDaysToTorontoDateKey(now, 1);
+    const endOfWeekKey = getEndOfWeekDateKey(now);
 
     return items.filter((match) => {
       const kickoff = new Date(match.kickoffAt);
@@ -113,7 +170,8 @@ export default function AdminMatchesClient({
           .includes(search.trim().toLowerCase());
 
       const stageMatches =
-        stageFilter === "All" || match.stage === stageFilter;
+        stageFilter === "All" ||
+        match.stage === stageFilter;
 
       const isPrevious =
         kickoff < now || match.status === "FINISHED";
@@ -123,7 +181,9 @@ export default function AdminMatchesClient({
       switch (timeFilter) {
         case "next24":
           timeMatches =
-            kickoff >= now && kickoff <= next24Hours;
+            kickoff >= now &&
+            kickoff <= next24Hours &&
+            match.status !== "FINISHED";
           break;
 
         case "today":
@@ -136,12 +196,14 @@ export default function AdminMatchesClient({
 
         case "thisWeek":
           timeMatches =
-            kickoff >= now && kickoff <= weekEnd;
+            kickoff >= now &&
+            kickoffDateKey <= endOfWeekKey &&
+            match.status !== "FINISHED";
           break;
 
         case "future":
           timeMatches =
-            kickoff >= now &&
+            kickoff > now &&
             match.status !== "FINISHED";
           break;
 
@@ -154,13 +216,13 @@ export default function AdminMatchesClient({
           break;
       }
 
-      return searchMatches && stageMatches && timeMatches;
+      return (
+        searchMatches &&
+        stageMatches &&
+        timeMatches
+      );
     });
   }, [items, search, stageFilter, timeFilter]);
-
-  const selectedMatch = items.find(
-    (match) => match.id === selectedMatchId
-  );
 
   async function updatePredictionPoints(
     predictionId: number,
@@ -168,59 +230,71 @@ export default function AdminMatchesClient({
   ) {
     setMessage("");
 
-    const response = await fetch(
-      "/api/admin/prediction-points",
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          predictionId,
-          points,
-        }),
-      }
-    );
-
-    const text = await response.text();
-
-    let data: {
-      error?: string;
-      message?: string;
-    } = {};
-
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data.error = "Invalid server response.";
-      }
-    }
-
-    if (!response.ok) {
-      setMessage(
-        data.error || "Could not update prediction points."
+    try {
+      const response = await fetch(
+        "/api/admin/prediction-points",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            predictionId,
+            points,
+          }),
+        }
       );
-      return;
+
+      const text = await response.text();
+
+      let data: {
+        error?: string;
+        message?: string;
+      } = {};
+
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = {
+            error: "The server returned an invalid response.",
+          };
+        }
+      }
+
+      if (!response.ok) {
+        setMessageType("error");
+        setMessage(
+          data.error ||
+            "Could not update prediction points."
+        );
+        return;
+      }
+
+      setItems((currentItems) =>
+        currentItems.map((match) => ({
+          ...match,
+          predictions: match.predictions.map(
+            (prediction) =>
+              prediction.id === predictionId
+                ? {
+                    ...prediction,
+                    points,
+                  }
+                : prediction
+          ),
+        }))
+      );
+
+      setMessageType("success");
+      setMessage(
+        data.message ||
+          "Prediction points updated successfully."
+      );
+    } catch {
+      setMessageType("error");
+      setMessage("Unable to connect to the server.");
     }
-
-    setItems((currentItems) =>
-      currentItems.map((match) => ({
-        ...match,
-        predictions: match.predictions.map((prediction) =>
-          prediction.id === predictionId
-            ? {
-                ...prediction,
-                points,
-              }
-            : prediction
-        ),
-      }))
-    );
-
-    setMessage(
-      data.message || "Prediction points updated."
-    );
   }
 
   return (
@@ -231,12 +305,18 @@ export default function AdminMatchesClient({
         </h1>
 
         <p className="mt-2 text-white/60">
-          Filter matches, review user predictions, and adjust
-          prediction points.
+          Filter matches, review user predictions, and
+          adjust prediction points.
         </p>
 
         {message && (
-          <p className="mt-4 rounded-xl bg-green-500/20 p-3 text-sm text-green-100">
+          <p
+            className={`mt-4 rounded-xl p-3 text-sm ${
+              messageType === "success"
+                ? "bg-green-500/20 text-green-100"
+                : "bg-red-500/20 text-red-100"
+            }`}
+          >
             {message}
           </p>
         )}
@@ -285,117 +365,120 @@ export default function AdminMatchesClient({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4">
-        {filteredMatches.map((match) => (
-          <button
-            key={match.id}
-            type="button"
-            onClick={() =>
-              setSelectedMatchId(
-                selectedMatchId === match.id
-                  ? null
-                  : match.id
-              )
-            }
-            className="w-full rounded-3xl border border-white/10 bg-white/10 p-5 text-left transition hover:bg-white/15"
-          >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold text-green-300">
-                  Match {match.matchNumber} · {match.stage}
-                </p>
+      {filteredMatches.length === 0 ? (
+        <div className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-8 text-center">
+          <h2 className="text-xl font-black">
+            No matches found
+          </h2>
 
-                <h2 className="mt-1 text-2xl font-black">
-                  {match.team1} vs {match.team2}
-                </h2>
+          <p className="mt-2 text-sm text-white/60">
+            Try changing the filters or search text.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-6 grid gap-4">
+          {filteredMatches.map((match) => {
+            const isSelected =
+              selectedMatchId === match.id;
 
-                <p className="mt-1 text-sm text-white/60">
-                  {formatKickoff(match.kickoffAt)}
-                </p>
-
-                <p className="mt-2 text-sm text-white/50">
-                  {match.predictions.length} submitted prediction
-                  {match.predictions.length === 1 ? "" : "s"}
-                </p>
-              </div>
-
-              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
-                {selectedMatchId === match.id
-                  ? "Hide predictions"
-                  : "View predictions"}
-              </span>
-            </div>
-          </button>
-        ))}
-      </div>
-
-      {selectedMatch && (
-        <section className="mt-6 rounded-3xl border border-green-400/20 bg-green-400/10 p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="font-bold text-green-300">
-                Match {selectedMatch.matchNumber}
-              </p>
-
-              <h2 className="mt-1 text-2xl font-black">
-                {selectedMatch.team1} vs{" "}
-                {selectedMatch.team2}
-              </h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setSelectedMatchId(null)}
-              className="rounded-xl bg-white/10 px-4 py-2 text-sm font-bold"
-            >
-              Close
-            </button>
-          </div>
-
-          {selectedMatch.predictions.length === 0 ? (
-            <p className="mt-5 text-white/60">
-              No users have submitted predictions for this match.
-            </p>
-          ) : (
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[650px] text-left text-sm">
-                <thead className="border-b border-white/10 text-white/50">
-                  <tr>
-                    <th className="p-3">Player</th>
-                    <th className="p-3">Username</th>
-                    <th className="p-3">Prediction</th>
-                    <th className="p-3">Current points</th>
-                    <th className="p-3">Adjust points</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {selectedMatch.predictions.map(
-                    (prediction) => (
-                      <PredictionRow
-                        key={prediction.id}
-                        prediction={prediction}
-                        onSave={updatePredictionPoints}
-                      />
+            return (
+              <div
+                key={match.id}
+                className="overflow-hidden rounded-3xl border border-white/10 bg-white/10"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedMatchId(
+                      isSelected ? null : match.id
                     )
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  }
+                  className="w-full p-5 text-left transition hover:bg-white/5"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-green-300">
+                        Match {match.matchNumber} ·{" "}
+                        {match.stage}
+                      </p>
+
+                      <h2 className="mt-1 text-2xl font-black">
+                        {match.team1} vs {match.team2}
+                      </h2>
+
+                      <p className="mt-1 text-sm text-white/60">
+                        {formatKickoff(match.kickoffAt)}
+                      </p>
+
+                      <p className="mt-2 text-sm text-white/50">
+                        {match.predictions.length} submitted{" "}
+                        prediction
+                        {match.predictions.length === 1
+                          ? ""
+                          : "s"}
+                      </p>
+                    </div>
+
+                    <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
+                      {isSelected
+                        ? "Hide predictions"
+                        : "View predictions"}
+                    </span>
+                  </div>
+                </button>
+
+                {isSelected && (
+                  <div className="border-t border-white/10 p-5">
+                    {match.predictions.length === 0 ? (
+                      <p className="text-sm text-white/60">
+                        No users have submitted predictions
+                        for this match.
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[680px] text-left text-sm">
+                          <thead className="border-b border-white/10 text-white/50">
+                            <tr>
+                              <th className="p-3">Player</th>
+                              <th className="p-3">Username</th>
+                              <th className="p-3">
+                                Prediction
+                              </th>
+                              <th className="p-3">
+                                Current Points
+                              </th>
+                              <th className="p-3">
+                                Adjust Points
+                              </th>
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {match.predictions.map(
+                              (prediction) => (
+                                <PredictionRow
+                                  key={prediction.id}
+                                  prediction={prediction}
+                                  onSave={
+                                    updatePredictionPoints
+                                  }
+                                />
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </section>
   );
 }
-
-type PredictionRowProps = {
-  prediction: AdminPrediction;
-  onSave: (
-    predictionId: number,
-    points: number
-  ) => Promise<void>;
-};
 
 function PredictionRow({
   prediction,
@@ -432,7 +515,7 @@ function PredictionRow({
             onChange={(event) =>
               setPoints(Number(event.target.value))
             }
-            className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white"
+            className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
           />
 
           <button
@@ -440,7 +523,7 @@ function PredictionRow({
             onClick={() =>
               onSave(prediction.id, points)
             }
-            className="rounded-lg bg-green-400 px-3 py-2 font-black text-slate-950"
+            className="rounded-lg bg-green-400 px-3 py-2 font-black text-slate-950 transition hover:bg-green-300"
           >
             Save
           </button>
