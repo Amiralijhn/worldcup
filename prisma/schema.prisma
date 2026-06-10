@@ -73,3 +73,19 @@ model ScoreAdjustment {
   user  User @relation("UserAdjustments", fields: [userId], references: [id], onDelete: Cascade)
   admin User @relation("AdminAdjustments", fields: [adminId], references: [id], onDelete: Cascade)
 }
+
+model TeamStandingOverride {
+  id           Int      @id @default(autoincrement())
+  group        String
+  team         String   @unique
+  played       Int      @default(0)
+  wins         Int      @default(0)
+  draws        Int      @default(0)
+  losses       Int      @default(0)
+  goalsFor     Int      @default(0)
+  goalsAgainst Int      @default(0)
+  points       Int      @default(0)
+  isActive     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

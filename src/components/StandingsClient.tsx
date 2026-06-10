@@ -19,8 +19,24 @@ type MatchItem = {
   } | null;
 };
 
+type StandingOverride = {
+  id: number;
+  group: string;
+  team: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  points: number;
+  isActive: boolean;
+};
+
 type StandingsClientProps = {
   matches: MatchItem[];
+  overrides: StandingOverride[];
+  isAdmin: boolean;
 };
 
 type GroupName =
@@ -50,14 +66,14 @@ type TeamStanding = {
 };
 
 const groups: Record<GroupName, string[]> = {
-  A: ["Mexico", "South Africa", "South Korea", "Czechia"],
+  A: ["Mexico", "South Africa", "Korea Republic", "Czechia"],
   B: ["Canada", "Switzerland", "Qatar", "Bosnia and Herzegovina"],
   C: ["Brazil", "Morocco", "Haiti", "Scotland"],
-  D: ["USA", "Paraguay", "Australia", "Türkiye"],
-  E: ["Germany", "Curaçao", "Ivory Coast", "Ecuador"],
+  D: ["United States", "Paraguay", "Australia", "Türkiye"],
+  E: ["Germany", "Curaçao", "Côte d’Ivoire", "Ecuador"],
   F: ["Netherlands", "Japan", "Tunisia", "Sweden"],
   G: ["Belgium", "Egypt", "Iran", "New Zealand"],
-  H: ["Spain", "Cape Verde", "Saudi Arabia", "Uruguay"],
+  H: ["Spain", "Cabo Verde", "Saudi Arabia", "Uruguay"],
   I: ["France", "Senegal", "Norway", "Iraq"],
   J: ["Argentina", "Algeria", "Austria", "Jordan"],
   K: ["Portugal", "Uzbekistan", "Colombia", "Congo DR"],
@@ -68,11 +84,11 @@ const groupNames = Object.keys(groups) as GroupName[];
 
 function normalizeTeamName(team: string) {
   const aliases: Record<string, string> = {
-    "Korea Republic": "South Korea",
-    "United States": "USA",
-    "Côte d’Ivoire": "Ivory Coast",
-    "Côte d'Ivoire": "Ivory Coast",
-    "Cabo Verde": "Cape Verde",
+    "South Korea": "Korea Republic",
+    USA: "United States",
+    "Ivory Coast": "Côte d’Ivoire",
+    "Côte d'Ivoire": "Côte d’Ivoire",
+    "Cape Verde": "Cabo Verde",
   };
 
   return aliases[team] || team;
@@ -109,6 +125,15 @@ function matchBelongsToGroup(match: MatchItem, teams: string[]) {
   const team2 = normalizeTeamName(match.team2);
 
   return teams.includes(team1) && teams.includes(team2);
+}
+
+function sortStandings(a: TeamStanding, b: TeamStanding) {
+  return (
+    b.points - a.points ||
+    b.goalDifference - a.goalDifference ||
+    b.goalsFor - a.goalsFor ||
+    a.team.localeCompare(b.team)
+  );
 }
 
 function calculateStandings(
@@ -162,17 +187,14 @@ function calculateStandings(
     if (team1Goals > team2Goals) {
       team1Standing.wins += 1;
       team1Standing.points += 3;
-
       team2Standing.losses += 1;
     } else if (team1Goals < team2Goals) {
       team2Standing.wins += 1;
       team2Standing.points += 3;
-
       team1Standing.losses += 1;
     } else {
       team1Standing.draws += 1;
       team2Standing.draws += 1;
-
       team1Standing.points += 1;
       team2Standing.points += 1;
     }
@@ -183,35 +205,59 @@ function calculateStandings(
       ...team,
       goalDifference: team.goalsFor - team.goalsAgainst,
     }))
-    .sort((a, b) => {
-      return (
-        b.points - a.points ||
-        b.goalDifference - a.goalDifference ||
-        b.goalsFor - a.goalsFor ||
-        a.team.localeCompare(b.team)
-      );
-    });
+    .sort(sortStandings);
 }
 
 export default function StandingsClient({
   matches,
+  overrides,
+  isAdmin,
 }: StandingsClientProps) {
   const [selectedGroup, setSelectedGroup] = useState<GroupName>("A");
+  const [standingOverrides, setStandingOverrides] = useState(overrides);
+  const [items, setItems] = useState(matches);
+  const [message, setMessage] = useState("");
 
   const groupTeams = groups[selectedGroup];
 
-  const standings = useMemo(
-    () => calculateStandings(selectedGroup, matches),
-    [selectedGroup, matches]
+  const calculatedStandings = useMemo(
+    () => calculateStandings(selectedGroup, items),
+    [selectedGroup, items]
   );
 
+  const finalStandings = useMemo(() => {
+    return calculatedStandings
+      .map((team) => {
+        const override = standingOverrides.find(
+          (item) => item.team === team.team && item.isActive
+        );
+
+        if (!override) {
+          return team;
+        }
+
+        return {
+          team: team.team,
+          played: override.played,
+          wins: override.wins,
+          draws: override.draws,
+          losses: override.losses,
+          goalsFor: override.goalsFor,
+          goalsAgainst: override.goalsAgainst,
+          goalDifference: override.goalsFor - override.goalsAgainst,
+          points: override.points,
+        };
+      })
+      .sort(sortStandings);
+  }, [calculatedStandings, standingOverrides]);
+
   const groupMatches = useMemo(() => {
-    return matches.filter(
+    return items.filter(
       (match) =>
         match.stage === "Group Stage" &&
         matchBelongsToGroup(match, groupTeams)
     );
-  }, [matches, groupTeams]);
+  }, [items, groupTeams]);
 
   return (
     <section>
@@ -219,9 +265,20 @@ export default function StandingsClient({
         <h1 className="text-3xl font-black">Group Standings</h1>
 
         <p className="mt-2 text-white/60">
-          Select a group to see the table, team points, group matches,
-          final results, and your predictions.
+          Select a group to see standings and group matches.
         </p>
+
+        {isAdmin && (
+          <p className="mt-2 text-sm text-yellow-300">
+            Admin mode: you can manually adjust standings and update final match results.
+          </p>
+        )}
+
+        {message && (
+          <p className="mt-4 rounded-xl bg-green-500/20 p-3 text-sm text-green-100">
+            {message}
+          </p>
+        )}
 
         <div className="mt-5 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-12">
           {groupNames.map((group) => (
@@ -248,9 +305,7 @@ export default function StandingsClient({
               Group {selectedGroup}
             </p>
 
-            <h2 className="mt-1 text-2xl font-black">
-              Standings
-            </h2>
+            <h2 className="mt-1 text-2xl font-black">Standings</h2>
           </div>
 
           <p className="text-sm text-white/50">
@@ -259,7 +314,7 @@ export default function StandingsClient({
         </div>
 
         <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-white/10 text-white/50">
               <tr>
                 <th className="p-3">#</th>
@@ -272,29 +327,41 @@ export default function StandingsClient({
                 <th className="p-3">GA</th>
                 <th className="p-3">GD</th>
                 <th className="p-3">Pts</th>
+                {isAdmin && <th className="p-3">Admin</th>}
               </tr>
             </thead>
 
             <tbody>
-              {standings.map((team, index) => (
-                <tr key={team.team} className="border-b border-white/10">
-                  <td className="p-3 font-black">#{index + 1}</td>
-                  <td className="p-3 font-bold">{team.team}</td>
-                  <td className="p-3">{team.played}</td>
-                  <td className="p-3">{team.wins}</td>
-                  <td className="p-3">{team.draws}</td>
-                  <td className="p-3">{team.losses}</td>
-                  <td className="p-3">{team.goalsFor}</td>
-                  <td className="p-3">{team.goalsAgainst}</td>
-                  <td className="p-3">
-                    {team.goalDifference > 0
-                      ? `+${team.goalDifference}`
-                      : team.goalDifference}
-                  </td>
-                  <td className="p-3 font-black text-green-300">
-                    {team.points}
-                  </td>
-                </tr>
+              {finalStandings.map((team, index) => (
+                <StandingRow
+                  key={team.team}
+                  team={team}
+                  index={index}
+                  selectedGroup={selectedGroup}
+                  isAdmin={isAdmin}
+                  override={standingOverrides.find(
+                    (item) => item.team === team.team
+                  )}
+                  onSaved={(savedOverride) => {
+                    setStandingOverrides((current) => {
+                      const exists = current.some(
+                        (item) => item.team === savedOverride.team
+                      );
+
+                      if (exists) {
+                        return current.map((item) =>
+                          item.team === savedOverride.team
+                            ? savedOverride
+                            : item
+                        );
+                      }
+
+                      return [...current, savedOverride];
+                    });
+
+                    setMessage("Standing updated successfully.");
+                  }}
+                />
               ))}
             </tbody>
           </table>
@@ -307,78 +374,343 @@ export default function StandingsClient({
         </h2>
 
         <div className="mt-5 grid gap-4">
-          {groupMatches.map((match) => {
-            const hasResult =
-              match.actualTeam1Score !== null &&
-              match.actualTeam2Score !== null;
+          {groupMatches.map((match) => (
+            <MatchCard
+              key={match.id}
+              match={match}
+              isAdmin={isAdmin}
+              onUpdated={(updatedMatch) => {
+                setItems((current) =>
+                  current.map((item) =>
+                    item.id === updatedMatch.id
+                      ? {
+                          ...item,
+                          actualTeam1Score: updatedMatch.actualTeam1Score,
+                          actualTeam2Score: updatedMatch.actualTeam2Score,
+                          status: updatedMatch.status,
+                        }
+                      : item
+                  )
+                );
 
-            return (
-              <article
-                key={match.id}
-                className="rounded-2xl border border-white/10 bg-black/20 p-5"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-green-300">
-                      Match {match.matchNumber}
-                    </p>
-
-                    <h3 className="mt-1 text-xl font-black">
-                      {match.team1} vs {match.team2}
-                    </h3>
-
-                    <p className="mt-1 text-sm text-white/50">
-                      {formatKickoff(match.kickoffAt)}
-                    </p>
-                  </div>
-
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${
-                      hasResult
-                        ? "bg-green-500/20 text-green-100"
-                        : "bg-white/10 text-white/70"
-                    }`}
-                  >
-                    {hasResult ? "Result Added" : "Upcoming"}
-                  </span>
-                </div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl bg-white/10 p-4">
-                    <p className="text-sm text-white/50">
-                      Final Result
-                    </p>
-
-                    <p className="mt-1 text-xl font-black">
-                      {hasResult
-                        ? `${match.actualTeam1Score} - ${match.actualTeam2Score}`
-                        : "Not added yet"}
-                    </p>
-                  </div>
-
-                  <div className="rounded-xl bg-white/10 p-4">
-                    <p className="text-sm text-white/50">
-                      Your Prediction
-                    </p>
-
-                    <p className="mt-1 text-xl font-black">
-                      {match.prediction
-                        ? `${match.prediction.predTeam1Score} - ${match.prediction.predTeam2Score}`
-                        : "No prediction"}
-                    </p>
-
-                    {match.prediction && (
-                      <p className="mt-1 text-sm text-green-300">
-                        Points: {match.prediction.points ?? 0}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+                setMessage("Final result updated successfully.");
+              }}
+            />
+          ))}
         </div>
       </div>
     </section>
+  );
+}
+
+type StandingRowProps = {
+  team: TeamStanding;
+  index: number;
+  selectedGroup: GroupName;
+  isAdmin: boolean;
+  override?: StandingOverride;
+  onSaved: (override: StandingOverride) => void;
+};
+
+function StandingRow({
+  team,
+  index,
+  selectedGroup,
+  isAdmin,
+  override,
+  onSaved,
+}: StandingRowProps) {
+  const [played, setPlayed] = useState(override?.played ?? team.played);
+  const [wins, setWins] = useState(override?.wins ?? team.wins);
+  const [draws, setDraws] = useState(override?.draws ?? team.draws);
+  const [losses, setLosses] = useState(override?.losses ?? team.losses);
+  const [goalsFor, setGoalsFor] = useState(override?.goalsFor ?? team.goalsFor);
+  const [goalsAgainst, setGoalsAgainst] = useState(
+    override?.goalsAgainst ?? team.goalsAgainst
+  );
+  const [points, setPoints] = useState(override?.points ?? team.points);
+  const [isActive, setIsActive] = useState(override?.isActive ?? false);
+  const [saving, setSaving] = useState(false);
+
+  async function saveStanding() {
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/admin/standings", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          group: selectedGroup,
+          team: team.team,
+          played,
+          wins,
+          draws,
+          losses,
+          goalsFor,
+          goalsAgainst,
+          points,
+          isActive,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Could not save standing.");
+        return;
+      }
+
+      onSaved(data.override);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!isAdmin) {
+    return (
+      <tr className="border-b border-white/10">
+        <td className="p-3 font-black">#{index + 1}</td>
+        <td className="p-3 font-bold">{team.team}</td>
+        <td className="p-3">{team.played}</td>
+        <td className="p-3">{team.wins}</td>
+        <td className="p-3">{team.draws}</td>
+        <td className="p-3">{team.losses}</td>
+        <td className="p-3">{team.goalsFor}</td>
+        <td className="p-3">{team.goalsAgainst}</td>
+        <td className="p-3">
+          {team.goalDifference > 0
+            ? `+${team.goalDifference}`
+            : team.goalDifference}
+        </td>
+        <td className="p-3 font-black text-green-300">{team.points}</td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="border-b border-white/10">
+      <td className="p-3 font-black">#{index + 1}</td>
+
+      <td className="p-3 font-bold">
+        {team.team}
+        {isActive && (
+          <span className="ml-2 rounded-full bg-yellow-400 px-2 py-1 text-xs font-black text-slate-950">
+            Manual
+          </span>
+        )}
+      </td>
+
+      <td className="p-2">
+        <NumberInput value={played} onChange={setPlayed} />
+      </td>
+
+      <td className="p-2">
+        <NumberInput value={wins} onChange={setWins} />
+      </td>
+
+      <td className="p-2">
+        <NumberInput value={draws} onChange={setDraws} />
+      </td>
+
+      <td className="p-2">
+        <NumberInput value={losses} onChange={setLosses} />
+      </td>
+
+      <td className="p-2">
+        <NumberInput value={goalsFor} onChange={setGoalsFor} />
+      </td>
+
+      <td className="p-2">
+        <NumberInput value={goalsAgainst} onChange={setGoalsAgainst} />
+      </td>
+
+      <td className="p-3">
+        {goalsFor - goalsAgainst > 0
+          ? `+${goalsFor - goalsAgainst}`
+          : goalsFor - goalsAgainst}
+      </td>
+
+      <td className="p-2">
+        <NumberInput value={points} onChange={setPoints} />
+      </td>
+
+      <td className="p-2">
+        <label className="flex items-center gap-2 text-xs text-white/70">
+          <input
+            type="checkbox"
+            checked={isActive}
+            onChange={(event) => setIsActive(event.target.checked)}
+          />
+          Use manual
+        </label>
+
+        <button
+          type="button"
+          onClick={saveStanding}
+          disabled={saving}
+          className="mt-2 rounded-lg bg-green-400 px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+type MatchCardProps = {
+  match: MatchItem;
+  isAdmin: boolean;
+  onUpdated: (match: {
+    id: number;
+    actualTeam1Score: number | null;
+    actualTeam2Score: number | null;
+    status: string;
+  }) => void;
+};
+
+function MatchCard({ match, isAdmin, onUpdated }: MatchCardProps) {
+  const hasResult =
+    match.actualTeam1Score !== null &&
+    match.actualTeam2Score !== null;
+
+  const [team1Score, setTeam1Score] = useState(match.actualTeam1Score ?? 0);
+  const [team2Score, setTeam2Score] = useState(match.actualTeam2Score ?? 0);
+  const [saving, setSaving] = useState(false);
+
+  async function saveResult() {
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/admin/match-result", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          matchId: match.id,
+          actualTeam1Score: team1Score,
+          actualTeam2Score: team2Score,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || "Could not update result.");
+        return;
+      }
+
+      onUpdated(data.match);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <article className="rounded-2xl border border-white/10 bg-black/20 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold text-green-300">
+            Match {match.matchNumber}
+          </p>
+
+          <h3 className="mt-1 text-xl font-black">
+            {match.team1} vs {match.team2}
+          </h3>
+
+          <p className="mt-1 text-sm text-white/50">
+            {formatKickoff(match.kickoffAt)}
+          </p>
+        </div>
+
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-bold ${
+            hasResult
+              ? "bg-green-500/20 text-green-100"
+              : "bg-white/10 text-white/70"
+          }`}
+        >
+          {hasResult ? "Result Added" : "Upcoming"}
+        </span>
+      </div>
+
+      <div className="mt-4 rounded-xl bg-white/10 p-4">
+        <p className="text-sm text-white/50">Final Result</p>
+
+        {!isAdmin ? (
+          <p className="mt-1 text-xl font-black">
+            {hasResult
+              ? `${match.actualTeam1Score} - ${match.actualTeam2Score}`
+              : "Not added yet"}
+          </p>
+        ) : (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <input
+              type="number"
+              min="0"
+              value={team1Score}
+              onChange={(event) => setTeam1Score(Number(event.target.value))}
+              className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
+            />
+
+            <span className="font-black">-</span>
+
+            <input
+              type="number"
+              min="0"
+              value={team2Score}
+              onChange={(event) => setTeam2Score(Number(event.target.value))}
+              className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
+            />
+
+            <button
+              type="button"
+              onClick={saveResult}
+              disabled={saving}
+              className="rounded-lg bg-green-400 px-4 py-2 font-black text-slate-950 transition hover:bg-green-300 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save Result"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!isAdmin && (
+        <div className="mt-4 rounded-xl bg-white/10 p-4">
+          <p className="text-sm text-white/50">Your Prediction</p>
+
+          <p className="mt-1 text-xl font-black">
+            {match.prediction
+              ? `${match.prediction.predTeam1Score} - ${match.prediction.predTeam2Score}`
+              : "No prediction"}
+          </p>
+
+          {match.prediction && (
+            <p className="mt-1 text-sm text-green-300">
+              Points: {match.prediction.points ?? 0}
+            </p>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+type NumberInputProps = {
+  value: number;
+  onChange: (value: number) => void;
+};
+
+function NumberInput({ value, onChange }: NumberInputProps) {
+  return (
+    <input
+      type="number"
+      min="0"
+      value={value}
+      onChange={(event) => onChange(Number(event.target.value))}
+      className="w-16 rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-center text-white outline-none"
+    />
   );
 }

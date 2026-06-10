@@ -41,6 +41,8 @@ export default async function StandingsPage() {
     },
   });
 
+  const overrides = await prisma.teamStandingOverride.findMany();
+
   const formattedMatches = matches.map((match: MatchWithPrediction) => ({
     id: match.id,
     matchNumber: match.matchNumber,
@@ -65,7 +67,11 @@ export default async function StandingsPage() {
       <div className="mx-auto max-w-6xl">
         <AppNavbar name={user.displayName} role={user.role} />
 
-        <StandingsClient matches={formattedMatches} />
+        <StandingsClient
+          matches={formattedMatches}
+          overrides={overrides}
+          isAdmin={user.role === "ADMIN"}
+        />
       </div>
     </main>
   );
