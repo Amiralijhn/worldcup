@@ -173,11 +173,11 @@ export default function LoginSignupForm() {
 
         <div className="mt-5 text-center">
   <Link
-    href="/rules"
-    className="text-sm font-bold text-green-300 transition hover:text-green-200 hover:underline"
-  >
-    Read Tournament Rules
-  </Link>
+  href="/rules"
+  className="text-sm font-bold text-green-300 hover:text-green-200 hover:underline"
+>
+  Read Tournament Rules
+</Link>
 </div>
       </form>
     </main>
