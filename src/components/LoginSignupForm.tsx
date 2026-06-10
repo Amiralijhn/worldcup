@@ -169,16 +169,18 @@ export default function LoginSignupForm() {
             ? "Login"
             : "Create Account"}
         </button>
-
-
-        <div className="mt-5 text-center">
+            <div className="mt-5 text-center">
   <Link
-  href="/rules"
-  className="text-sm font-bold text-green-300 hover:text-green-200 hover:underline"
->
-  Read Tournament Rules
-</Link>
+    href="/rules"
+    className="text-sm font-bold text-green-300 hover:text-green-200 hover:underline"
+  >
+    Read Tournament Rules
+  </Link>
 </div>
+
+        
+
+
       </form>
     </main>
   );

@@ -1,95 +1,6 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import AppNavbar from "@/components/AppNavbar";
-
-export default async function RulesPage() {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  return (
-    <main className="min-h-screen bg-slate-950 px-4 py-6 text-white">
-      <div className="mx-auto max-w-5xl">
-        <AppNavbar name={user.displayName} role={user.role} />
-
-        <section className="rounded-3xl border border-white/10 bg-white/10 p-5 shadow-xl sm:p-8">
-          <div className="mb-8">
-            <p className="font-bold text-green-300">Tournament Guide</p>
-
-            <h1 className="mt-2 text-3xl font-black sm:text-4xl">
-              Game Rules
-            </h1>
-
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60 sm:text-base">
-              Predict the final score of each World Cup match, earn points for
-              accurate predictions, and compete with the other players on the
-              leaderboard.
-            </p>
-          </div>
-
-          <div className="grid gap-5 md:grid-cols-2">
-            <RuleCard number="1" title="Submit your predictions">
-              Enter the score you believe each team will have at the end of the
-              match, then press Save Prediction.
-            </RuleCard>
-
-            <RuleCard number="2" title="Prediction deadline">
-              Predictions must be submitted before the scheduled kickoff time.
-              After kickoff, the match becomes locked and predictions cannot be
-              added or changed.
-            </RuleCard>
-
-            <RuleCard number="3" title="Changing a prediction">
-              You may update a saved prediction as many times as you want before
-              the match starts. The most recently saved prediction will be used.
-            </RuleCard>
-
-            <RuleCard number="4" title="Final match score">
-              Predictions are calculated using the official final score recorded
-              by the administrator. Extra-time or penalty-shootout rules should
-              follow the tournament organizer&apos;s announced scoring policy.
-            </RuleCard>
-
-            <RuleCard number="5" title="Earning points">
-              Points are awarded after the administrator enters the official
-              match result. More accurate predictions receive more points.
-            </RuleCard>
-
-            <RuleCard number="6" title="Leaderboard">
-              Your total score is shown on the leaderboard. Players are ranked
-              from the highest total points to the lowest.
-            </RuleCard>
-
-            <RuleCard number="7" title="Missing predictions">
-              A match with no submitted prediction earns zero points. The
-              leaderboard also shows how many predictions each player has
-              completed or missed.
-            </RuleCard>
-
-            <RuleCard number="8" title="Administrator decisions">
-              The administrator may correct match results or apply score
-              adjustments when necessary. Administrative decisions are final.
-            </RuleCard>
-          </div>
-
-          <div className="mt-8 rounded-2xl border border-green-400/20 bg-green-400/10 p-5">
-            <h2 className="text-xl font-black text-green-300">
-              Important
-            </h2>
-
-            <p className="mt-2 text-sm leading-6 text-white/70">
-              Always confirm that your prediction shows as saved before leaving
-              the page. Internet or browser problems do not automatically submit
-              a prediction.
-            </p>
-          </div>
-        </section>
-      </div>
-    </main>
-  );
-}
 
 type RuleCardProps = {
   number: string;
@@ -106,13 +17,95 @@ function RuleCard({ number, title, children }: RuleCardProps) {
         </div>
 
         <div>
-          <h2 className="text-lg font-black">{title}</h2>
-
-          <p className="mt-2 text-sm leading-6 text-white/60">
-            {children}
-          </p>
+          <h3 className="text-lg font-black">{title}</h3>
+          <p className="mt-2 text-sm leading-6 text-white/60">{children}</p>
         </div>
       </div>
     </article>
+  );
+}
+
+export default async function RulesPage() {
+  const user = await getCurrentUser();
+
+  return (
+    <main className="min-h-screen bg-slate-950 px-4 py-6 text-white">
+      <div className="mx-auto max-w-5xl">
+        {user ? (
+          <AppNavbar name={user.displayName} role={user.role} />
+        ) : (
+          <header className="mb-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-xl font-black">World Cup Prediction</h1>
+              <p className="text-sm text-white/60">Tournament Rules</p>
+            </div>
+
+            <Link
+              href="/login"
+              className="rounded-xl bg-green-400 px-4 py-2 text-center text-sm font-black text-slate-950 hover:bg-green-300"
+            >
+              Back to Login
+            </Link>
+          </header>
+        )}
+
+        <section className="rounded-3xl border border-white/10 bg-white/10 p-5 shadow-xl sm:p-8">
+          <p className="font-bold text-green-300">Tournament Guide</p>
+
+          <h2 className="mt-2 text-3xl font-black sm:text-4xl">
+            Game Rules
+          </h2>
+
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60 sm:text-base">
+            Predict match scores, earn points, and compete with other players.
+          </p>
+
+          <div className="mt-8 grid gap-5 md:grid-cols-2">
+            <RuleCard number="1" title="Submit predictions">
+              Enter both team scores and press Save.
+            </RuleCard>
+
+            <RuleCard number="2" title="Prediction deadline">
+              Predictions must be saved before kickoff. After kickoff, the
+              match becomes locked.
+            </RuleCard>
+
+            <RuleCard number="3" title="Change predictions">
+              You can update a prediction before kickoff. The latest saved
+              prediction will be used.
+            </RuleCard>
+
+            <RuleCard number="4" title="Official result">
+              The administrator enters the official result after the match.
+            </RuleCard>
+
+            <RuleCard number="5" title="How points are calculated">
+              Exact score earns 5 points. Correct goal difference earns 3
+              points. Correct winner or draw earns 2 points. Incorrect or
+              missing predictions earn 0 points.
+            </RuleCard>
+
+            <RuleCard number="6" title="Leaderboard">
+              Players are ranked from highest total points to lowest.
+            </RuleCard>
+
+            <RuleCard number="7" title="Missing predictions">
+              A match without a saved prediction earns 0 points.
+            </RuleCard>
+          </div>
+
+          {!user && (
+            <div className="mt-8 text-center">
+              <Link
+                href="/login"
+                className="inline-block rounded-xl bg-green-400 px-6 py-3 font-black text-slate-950 hover:bg-green-300"
+              >
+                Return to Login or Sign Up
+              </Link>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
   );
 }
