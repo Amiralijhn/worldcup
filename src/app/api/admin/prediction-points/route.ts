@@ -9,11 +9,28 @@ export async function PATCH(request: Request) {
     const body = await request.json();
 
     const predictionId = Number(body.predictionId);
+    const predTeam1Score = Number(body.predTeam1Score);
+    const predTeam2Score = Number(body.predTeam2Score);
     const points = Number(body.points);
 
     if (!Number.isInteger(predictionId)) {
       return NextResponse.json(
         { error: "Invalid prediction ID." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !Number.isInteger(predTeam1Score) ||
+      !Number.isInteger(predTeam2Score) ||
+      predTeam1Score < 0 ||
+      predTeam2Score < 0
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Predicted scores must be whole numbers greater than or equal to 0.",
+        },
         { status: 400 }
       );
     }
@@ -25,13 +42,13 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const prediction = await prisma.prediction.findUnique({
+    const existingPrediction = await prisma.prediction.findUnique({
       where: {
         id: predictionId,
       },
     });
 
-    if (!prediction) {
+    if (!existingPrediction) {
       return NextResponse.json(
         { error: "Prediction not found." },
         { status: 404 }
@@ -43,19 +60,23 @@ export async function PATCH(request: Request) {
         id: predictionId,
       },
       data: {
+        predTeam1Score,
+        predTeam2Score,
         points,
       },
     });
 
     return NextResponse.json({
-      message: "Prediction points updated successfully.",
+      message: "Prediction and points updated successfully.",
       prediction: updatedPrediction,
     });
   } catch (error) {
-    console.error("Update prediction points error:", error);
+    console.error("Admin prediction update error:", error);
 
     return NextResponse.json(
-      { error: "Admin access required or server error." },
+      {
+        error: "Admin access required or server error.",
+      },
       { status: 500 }
     );
   }

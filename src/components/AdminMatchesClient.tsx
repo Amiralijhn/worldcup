@@ -44,6 +44,8 @@ type PredictionRowProps = {
   prediction: AdminPrediction;
   onSave: (
     predictionId: number,
+    predTeam1Score: number,
+    predTeam2Score: number,
     points: number
   ) => Promise<void>;
 };
@@ -69,30 +71,22 @@ function getTorontoDateParts(date: Date) {
   }).formatToParts(date);
 
   return {
-    year: Number(
-      parts.find((part) => part.type === "year")?.value
-    ),
-    month: Number(
-      parts.find((part) => part.type === "month")?.value
-    ),
-    day: Number(
-      parts.find((part) => part.type === "day")?.value
-    ),
+    year: Number(parts.find((part) => part.type === "year")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+    day: Number(parts.find((part) => part.type === "day")?.value),
   };
 }
 
 function getTorontoDateKey(date: Date) {
   const { year, month, day } = getTorontoDateParts(date);
 
-  return `${year}-${String(month).padStart(2, "0")}-${String(
-    day
-  ).padStart(2, "0")}`;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
+    2,
+    "0"
+  )}`;
 }
 
-function addDaysToTorontoDateKey(
-  date: Date,
-  numberOfDays: number
-) {
+function addDaysToTorontoDateKey(date: Date, numberOfDays: number) {
   const { year, month, day } = getTorontoDateParts(date);
 
   const result = new Date(
@@ -224,8 +218,10 @@ export default function AdminMatchesClient({
     });
   }, [items, search, stageFilter, timeFilter]);
 
-  async function updatePredictionPoints(
+  async function updatePrediction(
     predictionId: number,
+    predTeam1Score: number,
+    predTeam2Score: number,
     points: number
   ) {
     setMessage("");
@@ -240,6 +236,8 @@ export default function AdminMatchesClient({
           },
           body: JSON.stringify({
             predictionId,
+            predTeam1Score,
+            predTeam2Score,
             points,
           }),
         }
@@ -265,8 +263,7 @@ export default function AdminMatchesClient({
       if (!response.ok) {
         setMessageType("error");
         setMessage(
-          data.error ||
-            "Could not update prediction points."
+          data.error || "Could not update prediction."
         );
         return;
       }
@@ -279,6 +276,8 @@ export default function AdminMatchesClient({
               prediction.id === predictionId
                 ? {
                     ...prediction,
+                    predTeam1Score,
+                    predTeam2Score,
                     points,
                   }
                 : prediction
@@ -289,7 +288,7 @@ export default function AdminMatchesClient({
       setMessageType("success");
       setMessage(
         data.message ||
-          "Prediction points updated successfully."
+          "Prediction updated successfully."
       );
     } catch {
       setMessageType("error");
@@ -305,8 +304,8 @@ export default function AdminMatchesClient({
         </h1>
 
         <p className="mt-2 text-white/60">
-          Filter matches, review user predictions, and
-          adjust prediction points.
+          Filter matches, review user predictions, and adjust
+          predicted scores and points.
         </p>
 
         {message && (
@@ -436,20 +435,21 @@ export default function AdminMatchesClient({
                       </p>
                     ) : (
                       <div className="overflow-x-auto">
-                        <table className="w-full min-w-[680px] text-left text-sm">
+                        <table className="w-full min-w-[760px] text-left text-sm">
                           <thead className="border-b border-white/10 text-white/50">
                             <tr>
                               <th className="p-3">Player</th>
                               <th className="p-3">Username</th>
                               <th className="p-3">
-                                Prediction
+                                Predicted Score
                               </th>
                               <th className="p-3">
                                 Current Points
                               </th>
                               <th className="p-3">
-                                Adjust Points
+                                New Points
                               </th>
+                              <th className="p-3">Save</th>
                             </tr>
                           </thead>
 
@@ -459,9 +459,7 @@ export default function AdminMatchesClient({
                                 <PredictionRow
                                   key={prediction.id}
                                   prediction={prediction}
-                                  onSave={
-                                    updatePredictionPoints
-                                  }
+                                  onSave={updatePrediction}
                                 />
                               )
                             )}
@@ -484,9 +482,34 @@ function PredictionRow({
   prediction,
   onSave,
 }: PredictionRowProps) {
+  const [predTeam1Score, setPredTeam1Score] = useState(
+    prediction.predTeam1Score
+  );
+
+  const [predTeam2Score, setPredTeam2Score] = useState(
+    prediction.predTeam2Score
+  );
+
   const [points, setPoints] = useState(
     prediction.points ?? 0
   );
+
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+
+    try {
+      await onSave(
+        prediction.id,
+        predTeam1Score,
+        predTeam2Score,
+        points
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <tr className="border-b border-white/10">
@@ -498,36 +521,60 @@ function PredictionRow({
         {prediction.user.username}
       </td>
 
-      <td className="p-3 font-black">
-        {prediction.predTeam1Score} -{" "}
-        {prediction.predTeam2Score}
-      </td>
-
-      <td className="p-3 text-green-300">
-        {prediction.points ?? 0}
-      </td>
-
       <td className="p-3">
         <div className="flex items-center gap-2">
           <input
             type="number"
-            value={points}
+            min="0"
+            value={predTeam1Score}
             onChange={(event) =>
-              setPoints(Number(event.target.value))
+              setPredTeam1Score(
+                Number(event.target.value)
+              )
             }
-            className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
+            className="w-16 rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-center text-white outline-none"
           />
 
-          <button
-            type="button"
-            onClick={() =>
-              onSave(prediction.id, points)
+          <span>-</span>
+
+          <input
+            type="number"
+            min="0"
+            value={predTeam2Score}
+            onChange={(event) =>
+              setPredTeam2Score(
+                Number(event.target.value)
+              )
             }
-            className="rounded-lg bg-green-400 px-3 py-2 font-black text-slate-950 transition hover:bg-green-300"
-          >
-            Save
-          </button>
+            className="w-16 rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-center text-white outline-none"
+          />
         </div>
+      </td>
+
+      <td className="p-3 font-bold text-green-300">
+        {prediction.points ?? 0}
+      </td>
+
+      <td className="p-3">
+        <input
+          type="number"
+          value={points}
+          onChange={(event) =>
+            setPoints(Number(event.target.value))
+          }
+          className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
+        />
+      </td>
+
+      <td className="p-3">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={handleSave}
+          className="rounded-lg bg-green-400 px-3 py-2 font-black text-slate-950 transition hover:bg-green-300 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
       </td>
     </tr>
   );
