@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 
 type AppNavbarProps = {
   name: string;
@@ -10,7 +11,7 @@ type AppNavbarProps = {
 
 type NavbarLinkProps = {
   href: string;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 export default function AppNavbar({ name, role }: AppNavbarProps) {
@@ -21,8 +22,10 @@ export default function AppNavbar({ name, role }: AppNavbarProps) {
       await fetch("/api/auth/logout", {
         method: "POST",
       });
+    } catch (error) {
+      console.error("Logout failed:", error);
     } finally {
-      router.push("/login");
+      router.replace("/login");
       router.refresh();
     }
   }
@@ -44,9 +47,7 @@ export default function AppNavbar({ name, role }: AppNavbarProps) {
           {role !== "ADMIN" && (
             <>
               <NavbarLink href="/dashboard">Portal</NavbarLink>
-
               <NavbarLink href="/matches">Matches</NavbarLink>
-
               <NavbarLink href="/leaderboard">
                 Leaderboard
               </NavbarLink>
