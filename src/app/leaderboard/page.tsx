@@ -14,7 +14,6 @@ type LeaderboardRow = {
   id: number;
   displayName: string;
   totalPoints: number;
-  predictionCount: number;
 };
 
 export default async function LeaderboardPage() {
@@ -52,7 +51,6 @@ export default async function LeaderboardPage() {
         id: player.id,
         displayName: player.displayName,
         totalPoints: predictionPoints + adjustmentPoints,
-        predictionCount: player.predictions.length,
       };
     })
     .sort(
@@ -68,6 +66,10 @@ export default async function LeaderboardPage() {
         <section className="rounded-3xl border border-white/10 bg-white/10 p-6">
           <h2 className="text-3xl font-black">Leaderboard</h2>
 
+          <p className="mt-2 text-sm text-white/60">
+            Players are ranked by total points.
+          </p>
+
           <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
             <table className="w-full text-left text-sm">
               <thead className="bg-black/30 text-white/60">
@@ -75,8 +77,6 @@ export default async function LeaderboardPage() {
                   <th className="p-4">Rank</th>
                   <th className="p-4">Player</th>
                   <th className="p-4">Points</th>
-                  <th className="p-4">Predictions</th>
-                  <th className="p-4">Missing</th>
                 </tr>
               </thead>
 
@@ -87,7 +87,9 @@ export default async function LeaderboardPage() {
                       key={player.id}
                       className="border-t border-white/10"
                     >
-                      <td className="p-4 font-black">#{index + 1}</td>
+                      <td className="p-4 font-black">
+                        #{index + 1}
+                      </td>
 
                       <td className="p-4 font-bold">
                         {player.displayName}
@@ -95,14 +97,6 @@ export default async function LeaderboardPage() {
 
                       <td className="p-4 text-xl font-black text-green-300">
                         {player.totalPoints}
-                      </td>
-
-                      <td className="p-4">
-                        {player.predictionCount}/104
-                      </td>
-
-                      <td className="p-4">
-                        {104 - player.predictionCount}
                       </td>
                     </tr>
                   )
