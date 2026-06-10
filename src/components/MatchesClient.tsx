@@ -23,6 +23,15 @@ type MatchesClientProps = {
   matches: MatchItem[];
 };
 
+type TimeFilter =
+  | "next24"
+  | "today"
+  | "tomorrow"
+  | "thisWeek"
+  | "future"
+  | "previous"
+  | "all";
+
 const stages = [
   "All",
   "Group Stage",
@@ -31,12 +40,59 @@ const stages = [
   "1/8",
   "1/4",
   "1/2 Final",
+  "Playoff",
   "Final",
 ];
 
-function formatKickoff(value: string) {
-  const date = new Date(value);
+function getTorontoDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
 
+  return {
+    year: Number(parts.find((part) => part.type === "year")?.value),
+    month: Number(parts.find((part) => part.type === "month")?.value),
+    day: Number(parts.find((part) => part.type === "day")?.value),
+  };
+}
+
+function getTorontoDateKey(date: Date) {
+  const { year, month, day } = getTorontoDateParts(date);
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(
+    2,
+    "0"
+  )}`;
+}
+
+function addDaysToTorontoDateKey(date: Date, days: number) {
+  const { year, month, day } = getTorontoDateParts(date);
+
+  const result = new Date(Date.UTC(year, month - 1, day + days));
+
+  return result.toISOString().slice(0, 10);
+}
+
+function getEndOfWeekDateKey(date: Date) {
+  const { year, month, day } = getTorontoDateParts(date);
+
+  const temporaryDate = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = temporaryDate.getUTCDay();
+
+  // Sunday is 0, Monday is 1, etc.
+  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+
+  temporaryDate.setUTCDate(
+    temporaryDate.getUTCDate() + daysUntilSunday
+  );
+
+  return temporaryDate.toISOString().slice(0, 10);
+}
+
+function formatKickoff(value: string) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Toronto",
     year: "numeric",
@@ -45,43 +101,103 @@ function formatKickoff(value: string) {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-  }).format(date);
+  }).format(new Date(value));
 }
 
-export default function MatchesClient({ matches }: MatchesClientProps) {
+function isMatchToday(kickoffAt: string) {
+  return (
+    getTorontoDateKey(new Date(kickoffAt)) ===
+    getTorontoDateKey(new Date())
+  );
+}
+
+function isMatchTomorrow(kickoffAt: string) {
+  return (
+    getTorontoDateKey(new Date(kickoffAt)) ===
+    addDaysToTorontoDateKey(new Date(), 1)
+  );
+}
+
+export default function MatchesClient({
+  matches,
+}: MatchesClientProps) {
   const [items, setItems] = useState(matches);
-  const [timeFilter, setTimeFilter] = useState("future");
+
+  // Default filter: upcoming matches during the next 24 hours.
+  const [timeFilter, setTimeFilter] =
+    useState<TimeFilter>("next24");
+
   const [stageFilter, setStageFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<
+    "success" | "error"
+  >("success");
 
   const filteredMatches = useMemo(() => {
     const now = new Date();
 
+    const twentyFourHoursFromNow = new Date(
+      now.getTime() + 24 * 60 * 60 * 1000
+    );
+
+    const todayKey = getTorontoDateKey(now);
+    const tomorrowKey = addDaysToTorontoDateKey(now, 1);
+    const endOfWeekKey = getEndOfWeekDateKey(now);
+
     return items.filter((match) => {
       const kickoff = new Date(match.kickoffAt);
+      const kickoffDateKey = getTorontoDateKey(kickoff);
 
-      const searchMatch = `${match.matchNumber} ${match.team1} ${match.team2}`
-        .toLowerCase()
-        .includes(search.toLowerCase());
+      const searchMatch =
+        `${match.matchNumber} ${match.team1} ${match.team2}`
+          .toLowerCase()
+          .includes(search.trim().toLowerCase());
 
       const stageMatch =
         stageFilter === "All" || match.stage === stageFilter;
 
-      const isPrevious =
+      const isFinished =
         match.status === "FINISHED" || kickoff < now;
 
-      const isToday =
-        kickoff.toDateString() === now.toDateString();
+      let timeMatch = false;
 
-      const isFuture =
-        kickoff > now && match.status !== "FINISHED";
+      switch (timeFilter) {
+        case "next24":
+          timeMatch =
+            kickoff >= now &&
+            kickoff <= twentyFourHoursFromNow &&
+            match.status !== "FINISHED";
+          break;
 
-      const timeMatch =
-        timeFilter === "all" ||
-        (timeFilter === "previous" && isPrevious) ||
-        (timeFilter === "today" && isToday) ||
-        (timeFilter === "future" && isFuture);
+        case "today":
+          timeMatch = kickoffDateKey === todayKey;
+          break;
+
+        case "tomorrow":
+          timeMatch = kickoffDateKey === tomorrowKey;
+          break;
+
+        case "thisWeek":
+          timeMatch =
+            kickoff >= now &&
+            kickoffDateKey <= endOfWeekKey &&
+            match.status !== "FINISHED";
+          break;
+
+        case "future":
+          timeMatch =
+            kickoff > now && match.status !== "FINISHED";
+          break;
+
+        case "previous":
+          timeMatch = isFinished;
+          break;
+
+        case "all":
+          timeMatch = true;
+          break;
+      }
 
       return searchMatch && stageMatch && timeMatch;
     });
@@ -94,7 +210,9 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
   ) {
     setItems((current) =>
       current.map((match) => {
-        if (match.id !== matchId) return match;
+        if (match.id !== matchId) {
+          return match;
+        }
 
         return {
           ...match,
@@ -114,83 +232,134 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
     );
   }
 
+  async function savePrediction(match: MatchItem) {
+    if (!match.prediction) {
+      setMessageType("error");
+      setMessage("Please enter both scores first.");
+      return;
+    }
 
-async function savePrediction(match: MatchItem) {
-  if (!match.prediction) {
-    setMessage("Please enter both scores first.");
-    return;
-  }
-
-  const response = await fetch("/api/predictions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      matchId: match.id,
-      predTeam1Score: match.prediction.predTeam1Score,
-      predTeam2Score: match.prediction.predTeam2Score,
-    }),
-  });
-
-  const text = await response.text();
-
-  let data: { error?: string; message?: string } = {};
-
-  if (text) {
     try {
-      data = JSON.parse(text);
+      const response = await fetch("/api/predictions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          matchId: match.id,
+          predTeam1Score:
+            match.prediction.predTeam1Score,
+          predTeam2Score:
+            match.prediction.predTeam2Score,
+        }),
+      });
+
+      const text = await response.text();
+
+      let data: {
+        error?: string;
+        message?: string;
+      } = {};
+
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = {
+            error: "The server returned an invalid response.",
+          };
+        }
+      }
+
+      if (!response.ok) {
+        setMessageType("error");
+        setMessage(
+          data.error || "Could not save prediction."
+        );
+        return;
+      }
+
+      setMessageType("success");
+      setMessage(
+        data.message || "Prediction saved successfully."
+      );
     } catch {
-      data = { error: text };
+      setMessageType("error");
+      setMessage("Unable to connect to the server.");
     }
   }
-
-  if (!response.ok) {
-    setMessage(data.error || "Could not save prediction");
-    return;
-  }
-
-  setMessage(data.message || "Prediction saved successfully.");
-}
-
 
   return (
     <section>
       <div className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-5">
         <h2 className="text-3xl font-black">Matches</h2>
+
         <p className="mt-2 text-white/60">
           Filter matches and predict future match scores.
         </p>
 
         {message && (
-          <p className="mt-4 rounded-xl bg-green-500/20 p-3 text-sm text-green-100">
+          <p
+            className={`mt-4 rounded-xl p-3 text-sm ${
+              messageType === "success"
+                ? "bg-green-500/20 text-green-100"
+                : "bg-red-500/20 text-red-100"
+            }`}
+          >
             {message}
           </p>
         )}
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
           <input
-            className="rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white outline-none"
+            className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
             placeholder="Search team or match number"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) =>
+              setSearch(event.target.value)
+            }
           />
 
           <select
-            className="rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white outline-none"
+            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
             value={timeFilter}
-            onChange={(e) => setTimeFilter(e.target.value)}
+            onChange={(event) =>
+              setTimeFilter(
+                event.target.value as TimeFilter
+              )
+            }
           >
-            <option value="future">Future matches</option>
-            <option value="today">Today matches</option>
-            <option value="previous">Previous matches</option>
+            <option value="next24">
+              Next matches in 24 hours
+            </option>
+
+            <option value="today">Today</option>
+
+            <option value="tomorrow">
+              Tomorrow
+            </option>
+
+            <option value="thisWeek">
+              This week
+            </option>
+
+            <option value="future">
+              All future matches
+            </option>
+
+            <option value="previous">
+              Previous matches
+            </option>
+
             <option value="all">All matches</option>
           </select>
 
           <select
-            className="rounded-xl bg-black/30 border border-white/10 px-4 py-3 text-white outline-none"
+            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
             value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
+            onChange={(event) =>
+              setStageFilter(event.target.value)
+            }
           >
             {stages.map((stage) => (
               <option key={stage} value={stage}>
@@ -201,105 +370,164 @@ async function savePrediction(match: MatchItem) {
         </div>
       </div>
 
-      <div className="grid gap-4">
-        {filteredMatches.map((match) => {
-          const kickoff = new Date(match.kickoffAt);
-          const locked =
-            kickoff <= new Date() || match.status === "FINISHED";
+      {timeFilter === "next24" && (
+        <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
+          <h3 className="font-black text-green-300">
+            Next Matches in 24 Hours
+          </h3>
 
-          return (
-            <div
-              key={match.id}
-              className="rounded-3xl border border-white/10 bg-white/10 p-5"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-green-300">
-                    Match {match.matchNumber} · {match.stage}
-                  </p>
+          <p className="mt-1 text-sm text-white/60">
+            Matches taking place today are marked with a
+            Today label.
+          </p>
+        </div>
+      )}
 
-                  <h3 className="mt-1 text-2xl font-black">
-                    {match.team1} vs {match.team2}
-                  </h3>
+      {filteredMatches.length === 0 ? (
+        <div className="rounded-3xl border border-white/10 bg-white/10 p-8 text-center">
+          <h3 className="text-xl font-black">
+            No matches found
+          </h3>
 
-                  <p className="mt-1 text-white/60">
-                    {formatKickoff(match.kickoffAt)}
-                  </p>
+          <p className="mt-2 text-sm text-white/60">
+            Try selecting another time or stage filter.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {filteredMatches.map((match) => {
+            const kickoff = new Date(match.kickoffAt);
+
+            const locked =
+              kickoff <= new Date() ||
+              match.status === "FINISHED";
+
+            const today = isMatchToday(match.kickoffAt);
+            const tomorrow = isMatchTomorrow(
+              match.kickoffAt
+            );
+
+            return (
+              <div
+                key={match.id}
+                className="rounded-3xl border border-white/10 bg-white/10 p-5"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-green-300">
+                      Match {match.matchNumber} ·{" "}
+                      {match.stage}
+                    </p>
+
+                    <h3 className="mt-1 text-2xl font-black">
+                      {match.team1} vs {match.team2}
+                    </h3>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <p className="text-sm text-white/60">
+                        {formatKickoff(match.kickoffAt)}
+                      </p>
+
+                      {today && (
+                        <span className="rounded-full bg-green-400 px-2 py-1 text-xs font-black text-slate-950">
+                          Today
+                        </span>
+                      )}
+
+                      {tomorrow && (
+                        <span className="rounded-full bg-blue-400 px-2 py-1 text-xs font-black text-slate-950">
+                          Tomorrow
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${
+                      locked
+                        ? "bg-red-500/20 text-red-100"
+                        : "bg-green-500/20 text-green-100"
+                    }`}
+                  >
+                    {locked ? "Locked" : "Open"}
+                  </span>
                 </div>
 
-                <span
-                  className={`rounded-full px-3 py-1 text-xs font-bold ${
-                    locked
-                      ? "bg-red-500/20 text-red-100"
-                      : "bg-green-500/20 text-green-100"
-                  }`}
-                >
-                  {locked ? "Locked" : "Open"}
-                </span>
-              </div>
+                {match.status === "FINISHED" && (
+                  <p className="mt-4 text-white/70">
+                    Actual score:{" "}
+                    <span className="font-black text-white">
+                      {match.actualTeam1Score} -{" "}
+                      {match.actualTeam2Score}
+                    </span>{" "}
+                    · Your points:{" "}
+                    <span className="font-black text-green-300">
+                      {match.prediction?.points ?? 0}
+                    </span>
+                  </p>
+                )}
 
-              {match.status === "FINISHED" && (
-                <p className="mt-4 text-white/70">
-                  Actual score:{" "}
-                  <span className="font-black text-white">
-                    {match.actualTeam1Score} - {match.actualTeam2Score}
-                  </span>{" "}
-                  · Your points:{" "}
-                  <span className="font-black text-green-300">
-                    {match.prediction?.points ?? 0}
+                <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto_1fr_auto] sm:items-center">
+                  <span className="font-bold">
+                    {match.team1}
                   </span>
-                </p>
-              )}
 
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <span className="w-48 font-bold">{match.team1}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    disabled={locked}
+                    value={
+                      match.prediction?.predTeam1Score ??
+                      ""
+                    }
+                    onChange={(event) =>
+                      updateLocalPrediction(
+                        match.id,
+                        "predTeam1Score",
+                        Number(event.target.value)
+                      )
+                    }
+                    className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-center text-white outline-none disabled:opacity-40 sm:w-20"
+                  />
 
-                <input
-                  type="number"
-                  min="0"
-                  disabled={locked}
-                  value={match.prediction?.predTeam1Score ?? ""}
-                  onChange={(e) =>
-                    updateLocalPrediction(
-                      match.id,
-                      "predTeam1Score",
-                      Number(e.target.value)
-                    )
-                  }
-                  className="w-20 rounded-xl bg-black/30 border border-white/10 px-3 py-3 text-center text-white outline-none disabled:opacity-40"
-                />
+                  <span className="hidden sm:block">-</span>
 
-                <span>-</span>
+                  <input
+                    type="number"
+                    min="0"
+                    disabled={locked}
+                    value={
+                      match.prediction?.predTeam2Score ??
+                      ""
+                    }
+                    onChange={(event) =>
+                      updateLocalPrediction(
+                        match.id,
+                        "predTeam2Score",
+                        Number(event.target.value)
+                      )
+                    }
+                    className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-center text-white outline-none disabled:opacity-40 sm:w-20"
+                  />
 
-                <input
-                  type="number"
-                  min="0"
-                  disabled={locked}
-                  value={match.prediction?.predTeam2Score ?? ""}
-                  onChange={(e) =>
-                    updateLocalPrediction(
-                      match.id,
-                      "predTeam2Score",
-                      Number(e.target.value)
-                    )
-                  }
-                  className="w-20 rounded-xl bg-black/30 border border-white/10 px-3 py-3 text-center text-white outline-none disabled:opacity-40"
-                />
+                  <span className="font-bold">
+                    {match.team2}
+                  </span>
 
-                <span className="w-48 font-bold">{match.team2}</span>
-
-                <button
-                  disabled={locked}
-                  onClick={() => savePrediction(match)}
-                  className="rounded-xl bg-green-400 px-4 py-3 font-black text-slate-950 disabled:opacity-40"
-                >
-                  Save
-                </button>
+                  <button
+                    type="button"
+                    disabled={locked}
+                    onClick={() => savePrediction(match)}
+                    className="rounded-xl bg-green-400 px-4 py-3 font-black text-slate-950 transition hover:bg-green-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Save
+                  </button>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
