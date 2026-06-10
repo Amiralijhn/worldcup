@@ -49,13 +49,11 @@ export default function AppNavbar({
         <nav className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:w-auto lg:justify-end">
           {role === "PLAYER" && (
             <>
-              <NavbarLink href="/dashboard">
-                Portal
-              </NavbarLink>
+              <NavbarLink href="/dashboard">Portal</NavbarLink>
 
-              <NavbarLink href="/matches">
-                Matches
-              </NavbarLink>
+              <NavbarLink href="/matches">Matches</NavbarLink>
+
+              <NavbarLink href="/standings">Standings</NavbarLink>
 
               <NavbarLink href="/leaderboard">
                 Leaderboard
@@ -64,14 +62,18 @@ export default function AppNavbar({
           )}
 
           {role === "ADMIN" && (
-            <NavbarLink href="/admin">
-              Manage Matches
-            </NavbarLink>
+            <>
+              <NavbarLink href="/admin">
+                Manage Matches
+              </NavbarLink>
+
+              <NavbarLink href="/standings">
+                Standings
+              </NavbarLink>
+            </>
           )}
 
-          <NavbarLink href="/rules">
-            Rules
-          </NavbarLink>
+          <NavbarLink href="/rules">Rules</NavbarLink>
 
           <NavbarLink href="/change-password">
             Change Password
