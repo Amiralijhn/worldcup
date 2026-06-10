@@ -82,7 +82,6 @@ function getEndOfWeekDateKey(date: Date) {
   const temporaryDate = new Date(Date.UTC(year, month - 1, day));
   const dayOfWeek = temporaryDate.getUTCDay();
 
-  // Sunday is 0, Monday is 1, etc.
   const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
 
   temporaryDate.setUTCDate(
@@ -123,7 +122,6 @@ export default function MatchesClient({
 }: MatchesClientProps) {
   const [items, setItems] = useState(matches);
 
-  // Default filter: upcoming matches during the next 24 hours.
   const [timeFilter, setTimeFilter] =
     useState<TimeFilter>("next24");
 
@@ -247,10 +245,8 @@ export default function MatchesClient({
         },
         body: JSON.stringify({
           matchId: match.id,
-          predTeam1Score:
-            match.prediction.predTeam1Score,
-          predTeam2Score:
-            match.prediction.predTeam2Score,
+          predTeam1Score: match.prediction.predTeam1Score,
+          predTeam2Score: match.prediction.predTeam2Score,
         }),
       });
 
@@ -273,16 +269,12 @@ export default function MatchesClient({
 
       if (!response.ok) {
         setMessageType("error");
-        setMessage(
-          data.error || "Could not save prediction."
-        );
+        setMessage(data.error || "Could not save prediction.");
         return;
       }
 
       setMessageType("success");
-      setMessage(
-        data.message || "Prediction saved successfully."
-      );
+      setMessage(data.message || "Prediction saved successfully.");
     } catch {
       setMessageType("error");
       setMessage("Unable to connect to the server.");
@@ -315,51 +307,29 @@ export default function MatchesClient({
             className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
             placeholder="Search team or match number"
             value={search}
-            onChange={(event) =>
-              setSearch(event.target.value)
-            }
+            onChange={(event) => setSearch(event.target.value)}
           />
 
           <select
             className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
             value={timeFilter}
             onChange={(event) =>
-              setTimeFilter(
-                event.target.value as TimeFilter
-              )
+              setTimeFilter(event.target.value as TimeFilter)
             }
           >
-            <option value="next24">
-              Next matches in 24 hours
-            </option>
-
+            <option value="next24">Next matches in 24 hours</option>
             <option value="today">Today</option>
-
-            <option value="tomorrow">
-              Tomorrow
-            </option>
-
-            <option value="thisWeek">
-              This week
-            </option>
-
-            <option value="future">
-              All future matches
-            </option>
-
-            <option value="previous">
-              Previous matches
-            </option>
-
+            <option value="tomorrow">Tomorrow</option>
+            <option value="thisWeek">This week</option>
+            <option value="future">All future matches</option>
+            <option value="previous">Previous matches</option>
             <option value="all">All matches</option>
           </select>
 
           <select
             className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
             value={stageFilter}
-            onChange={(event) =>
-              setStageFilter(event.target.value)
-            }
+            onChange={(event) => setStageFilter(event.target.value)}
           >
             {stages.map((stage) => (
               <option key={stage} value={stage}>
@@ -377,17 +347,14 @@ export default function MatchesClient({
           </h3>
 
           <p className="mt-1 text-sm text-white/60">
-            Matches taking place today are marked with a
-            Today label.
+            Matches taking place today are marked with a Today label.
           </p>
         </div>
       )}
 
       {filteredMatches.length === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-white/10 p-8 text-center">
-          <h3 className="text-xl font-black">
-            No matches found
-          </h3>
+          <h3 className="text-xl font-black">No matches found</h3>
 
           <p className="mt-2 text-sm text-white/60">
             Try selecting another time or stage filter.
@@ -399,13 +366,14 @@ export default function MatchesClient({
             const kickoff = new Date(match.kickoffAt);
 
             const locked =
-              kickoff <= new Date() ||
-              match.status === "FINISHED";
+              kickoff <= new Date() || match.status === "FINISHED";
 
             const today = isMatchToday(match.kickoffAt);
-            const tomorrow = isMatchTomorrow(
-              match.kickoffAt
-            );
+            const tomorrow = isMatchTomorrow(match.kickoffAt);
+
+            const hasResult =
+              match.actualTeam1Score !== null &&
+              match.actualTeam2Score !== null;
 
             return (
               <div
@@ -415,8 +383,7 @@ export default function MatchesClient({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-bold text-green-300">
-                      Match {match.matchNumber} ·{" "}
-                      {match.stage}
+                      Match {match.matchNumber} · {match.stage}
                     </p>
 
                     <h3 className="mt-1 text-2xl font-black">
@@ -453,33 +420,50 @@ export default function MatchesClient({
                   </span>
                 </div>
 
-                {match.status === "FINISHED" && (
-                  <p className="mt-4 text-white/70">
-                    Actual score:{" "}
-                    <span className="font-black text-white">
-                      {match.actualTeam1Score} -{" "}
-                      {match.actualTeam2Score}
-                    </span>{" "}
-                    · Your points:{" "}
-                    <span className="font-black text-green-300">
-                      {match.prediction?.points ?? 0}
-                    </span>
-                  </p>
-                )}
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl bg-black/20 p-4">
+                    <p className="text-sm text-white/50">Final Result</p>
+
+                    <p className="mt-1 text-xl font-black">
+                      {hasResult
+                        ? `${match.actualTeam1Score} - ${match.actualTeam2Score}`
+                        : "Not added yet"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-black/20 p-4">
+                    <p className="text-sm text-white/50">
+                      Your Prediction
+                    </p>
+
+                    <p className="mt-1 text-xl font-black">
+                      {match.prediction
+                        ? `${match.prediction.predTeam1Score} - ${match.prediction.predTeam2Score}`
+                        : "No prediction"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-black/20 p-4">
+                    <p className="text-sm text-white/50">
+                      Points Earned
+                    </p>
+
+                    <p className="mt-1 text-xl font-black text-green-300">
+                      {hasResult
+                        ? match.prediction?.points ?? 0
+                        : "Pending"}
+                    </p>
+                  </div>
+                </div>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto_auto_auto_1fr_auto] sm:items-center">
-                  <span className="font-bold">
-                    {match.team1}
-                  </span>
+                  <span className="font-bold">{match.team1}</span>
 
                   <input
                     type="number"
                     min="0"
                     disabled={locked}
-                    value={
-                      match.prediction?.predTeam1Score ??
-                      ""
-                    }
+                    value={match.prediction?.predTeam1Score ?? ""}
                     onChange={(event) =>
                       updateLocalPrediction(
                         match.id,
@@ -496,10 +480,7 @@ export default function MatchesClient({
                     type="number"
                     min="0"
                     disabled={locked}
-                    value={
-                      match.prediction?.predTeam2Score ??
-                      ""
-                    }
+                    value={match.prediction?.predTeam2Score ?? ""}
                     onChange={(event) =>
                       updateLocalPrediction(
                         match.id,
@@ -510,9 +491,7 @@ export default function MatchesClient({
                     className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-center text-white outline-none disabled:opacity-40 sm:w-20"
                   />
 
-                  <span className="font-bold">
-                    {match.team2}
-                  </span>
+                  <span className="font-bold">{match.team2}</span>
 
                   <button
                     type="button"
