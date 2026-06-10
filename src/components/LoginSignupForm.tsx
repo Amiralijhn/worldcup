@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -168,6 +169,16 @@ export default function LoginSignupForm() {
             ? "Login"
             : "Create Account"}
         </button>
+
+
+        <div className="mt-5 text-center">
+  <Link
+    href="/rules"
+    className="text-sm font-bold text-green-300 transition hover:text-green-200 hover:underline"
+  >
+    Read Tournament Rules
+  </Link>
+</div>
       </form>
     </main>
   );
