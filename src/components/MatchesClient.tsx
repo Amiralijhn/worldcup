@@ -23,15 +23,6 @@ type MatchesClientProps = {
   matches: MatchItem[];
 };
 
-type TimeFilter =
-  | "next24"
-  | "today"
-  | "tomorrow"
-  | "thisWeek"
-  | "future"
-  | "previous"
-  | "all";
-
 const stages = [
   "All",
   "Group Stage",
@@ -76,21 +67,6 @@ function addDaysToTorontoDateKey(date: Date, days: number) {
   return result.toISOString().slice(0, 10);
 }
 
-function getEndOfWeekDateKey(date: Date) {
-  const { year, month, day } = getTorontoDateParts(date);
-
-  const temporaryDate = new Date(Date.UTC(year, month - 1, day));
-  const dayOfWeek = temporaryDate.getUTCDay();
-
-  const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-
-  temporaryDate.setUTCDate(
-    temporaryDate.getUTCDate() + daysUntilSunday
-  );
-
-  return temporaryDate.toISOString().slice(0, 10);
-}
-
 function formatKickoff(value: string) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Toronto",
@@ -101,6 +77,26 @@ function formatKickoff(value: string) {
     minute: "2-digit",
     hour12: true,
   }).format(new Date(value));
+}
+
+function formatDateTile(dateKey: string) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+
+  return new Intl.DateTimeFormat("en-CA", {
+    month: "short",
+    day: "2-digit",
+  }).format(date);
+}
+
+function formatDateTitle(dateKey: string) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+
+  return new Intl.DateTimeFormat("en-CA", {
+    weekday: "long",
+    month: "long",
+    day: "2-digit",
+    year: "numeric",
+  }).format(date);
 }
 
 function isMatchToday(kickoffAt: string) {
@@ -117,89 +113,66 @@ function isMatchTomorrow(kickoffAt: string) {
   );
 }
 
-export default function MatchesClient({
-  matches,
-}: MatchesClientProps) {
+export default function MatchesClient({ matches }: MatchesClientProps) {
   const [items, setItems] = useState(matches);
-
-  const [timeFilter, setTimeFilter] =
-    useState<TimeFilter>("next24");
-
   const [stageFilter, setStageFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<
-    "success" | "error"
-  >("success");
+  const [messageType, setMessageType] = useState<"success" | "error">(
+    "success"
+  );
 
-  const filteredMatches = useMemo(() => {
-    const now = new Date();
+  const todayKey = getTorontoDateKey(new Date());
 
-    const twentyFourHoursFromNow = new Date(
-      now.getTime() + 24 * 60 * 60 * 1000
-    );
+  const dateKeys = useMemo(() => {
+    const uniqueDates = new Set<string>();
 
-    const todayKey = getTorontoDateKey(now);
-    const tomorrowKey = addDaysToTorontoDateKey(now, 1);
-    const endOfWeekKey = getEndOfWeekDateKey(now);
+    items.forEach((match) => {
+      uniqueDates.add(getTorontoDateKey(new Date(match.kickoffAt)));
+    });
 
+    return Array.from(uniqueDates).sort();
+  }, [items]);
+
+  const defaultDateKey =
+    dateKeys.find((dateKey) => dateKey >= todayKey) || dateKeys[0] || "";
+
+  const [selectedDateKey, setSelectedDateKey] = useState(defaultDateKey);
+
+  const selectedDateMatches = useMemo(() => {
     return items.filter((match) => {
-      const kickoff = new Date(match.kickoffAt);
-      const kickoffDateKey = getTorontoDateKey(kickoff);
+      const matchDateKey = getTorontoDateKey(new Date(match.kickoffAt));
+
+      const dateMatch = matchDateKey === selectedDateKey;
 
       const searchMatch =
         `${match.matchNumber} ${match.team1} ${match.team2}`
           .toLowerCase()
           .includes(search.trim().toLowerCase());
 
-      const stageMatch =
-        stageFilter === "All" || match.stage === stageFilter;
+      const stageMatch = stageFilter === "All" || match.stage === stageFilter;
 
-      const isFinished =
-        match.status === "FINISHED" || kickoff < now;
-
-      let timeMatch = false;
-
-      switch (timeFilter) {
-        case "next24":
-          timeMatch =
-            kickoff >= now &&
-            kickoff <= twentyFourHoursFromNow &&
-            match.status !== "FINISHED";
-          break;
-
-        case "today":
-          timeMatch = kickoffDateKey === todayKey;
-          break;
-
-        case "tomorrow":
-          timeMatch = kickoffDateKey === tomorrowKey;
-          break;
-
-        case "thisWeek":
-          timeMatch =
-            kickoff >= now &&
-            kickoffDateKey <= endOfWeekKey &&
-            match.status !== "FINISHED";
-          break;
-
-        case "future":
-          timeMatch =
-            kickoff > now && match.status !== "FINISHED";
-          break;
-
-        case "previous":
-          timeMatch = isFinished;
-          break;
-
-        case "all":
-          timeMatch = true;
-          break;
-      }
-
-      return searchMatch && stageMatch && timeMatch;
+      return dateMatch && searchMatch && stageMatch;
     });
-  }, [items, search, stageFilter, timeFilter]);
+  }, [items, selectedDateKey, search, stageFilter]);
+
+  const selectedDateIsPast = selectedDateKey < todayKey;
+
+  const selectedDateTotalPoints = selectedDateMatches.reduce(
+    (sum, match) => sum + (match.prediction?.points ?? 0),
+    0
+  );
+
+  function getDatePoints(dateKey: string) {
+    const matchesOnDate = items.filter(
+      (match) => getTorontoDateKey(new Date(match.kickoffAt)) === dateKey
+    );
+
+    return matchesOnDate.reduce(
+      (sum, match) => sum + (match.prediction?.points ?? 0),
+      0
+    );
+  }
 
   function updateLocalPrediction(
     matchId: number,
@@ -287,7 +260,7 @@ export default function MatchesClient({
         <h2 className="text-3xl font-black">Matches</h2>
 
         <p className="mt-2 text-white/60">
-          Filter matches and predict future match scores.
+          Select a date to see the matches on that day.
         </p>
 
         {message && (
@@ -302,29 +275,13 @@ export default function MatchesClient({
           </p>
         )}
 
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
           <input
             className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
             placeholder="Search team or match number"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-
-          <select
-            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-            value={timeFilter}
-            onChange={(event) =>
-              setTimeFilter(event.target.value as TimeFilter)
-            }
-          >
-            <option value="next24">Next matches in 24 hours</option>
-            <option value="today">Today</option>
-            <option value="tomorrow">Tomorrow</option>
-            <option value="thisWeek">This week</option>
-            <option value="future">All future matches</option>
-            <option value="previous">Previous matches</option>
-            <option value="all">All matches</option>
-          </select>
 
           <select
             className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
@@ -340,33 +297,83 @@ export default function MatchesClient({
         </div>
       </div>
 
-      {timeFilter === "next24" && (
-        <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
-          <h3 className="font-black text-green-300">
-            Next Matches in 24 Hours
-          </h3>
+      <div className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-5">
+        <h3 className="text-xl font-black">Choose Date</h3>
 
-          <p className="mt-1 text-sm text-white/60">
-            Matches taking place today are marked with a Today label.
-          </p>
+        <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+          {dateKeys.map((dateKey) => {
+            const isSelected = selectedDateKey === dateKey;
+            const isPast = dateKey < todayKey;
+            const isToday = dateKey === todayKey;
+            const isTomorrow = dateKey === addDaysToTorontoDateKey(new Date(), 1);
+            const totalPoints = getDatePoints(dateKey);
+
+            return (
+              <button
+                key={dateKey}
+                type="button"
+                onClick={() => setSelectedDateKey(dateKey)}
+                className={`min-w-[130px] rounded-2xl border p-4 text-left transition ${
+                  isSelected
+                    ? "border-green-400 bg-green-400 text-slate-950"
+                    : "border-white/10 bg-black/20 text-white hover:bg-white/10"
+                }`}
+              >
+                <p className="text-lg font-black">{formatDateTile(dateKey)}</p>
+
+                <p
+                  className={`mt-1 text-xs font-bold ${
+                    isSelected ? "text-slate-800" : "text-white/50"
+                  }`}
+                >
+                  {isToday
+                    ? "Today"
+                    : isTomorrow
+                    ? "Tomorrow"
+                    : isPast
+                    ? "Past"
+                    : "Upcoming"}
+                </p>
+
+                {isPast && (
+                  <p
+                    className={`mt-2 text-xs font-black ${
+                      isSelected ? "text-slate-950" : "text-green-300"
+                    }`}
+                  >
+                    Points: {totalPoints}
+                  </p>
+                )}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </div>
 
-      {filteredMatches.length === 0 ? (
+      <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
+        <h3 className="font-black text-green-300">
+          {selectedDateKey ? formatDateTitle(selectedDateKey) : "Selected Date"}
+        </h3>
+
+        <p className="mt-1 text-sm text-white/60">
+          Showing matches for the selected date.
+        </p>
+      </div>
+
+      {selectedDateMatches.length === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-white/10 p-8 text-center">
           <h3 className="text-xl font-black">No matches found</h3>
 
           <p className="mt-2 text-sm text-white/60">
-            Try selecting another time or stage filter.
+            Try selecting another date, stage, or search text.
           </p>
         </div>
       ) : (
         <div className="grid gap-4">
-          {filteredMatches.map((match) => {
+          {selectedDateMatches.map((match) => {
             const kickoff = new Date(match.kickoffAt);
 
-            const locked =
-              kickoff <= new Date() || match.status === "FINISHED";
+            const locked = kickoff <= new Date() || match.status === "FINISHED";
 
             const today = isMatchToday(match.kickoffAt);
             const tomorrow = isMatchTomorrow(match.kickoffAt);
@@ -432,9 +439,7 @@ export default function MatchesClient({
                   </div>
 
                   <div className="rounded-xl bg-black/20 p-4">
-                    <p className="text-sm text-white/50">
-                      Your Prediction
-                    </p>
+                    <p className="text-sm text-white/50">Your Prediction</p>
 
                     <p className="mt-1 text-xl font-black">
                       {match.prediction
@@ -444,14 +449,10 @@ export default function MatchesClient({
                   </div>
 
                   <div className="rounded-xl bg-black/20 p-4">
-                    <p className="text-sm text-white/50">
-                      Points Earned
-                    </p>
+                    <p className="text-sm text-white/50">Points Earned</p>
 
                     <p className="mt-1 text-xl font-black text-green-300">
-                      {hasResult
-                        ? match.prediction?.points ?? 0
-                        : "Pending"}
+                      {hasResult ? match.prediction?.points ?? 0 : "Pending"}
                     </p>
                   </div>
                 </div>
@@ -505,6 +506,18 @@ export default function MatchesClient({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {selectedDateIsPast && (
+        <div className="mt-6 rounded-3xl border border-green-400/20 bg-green-400/10 p-5 text-center">
+          <p className="text-sm font-bold text-green-300">
+            Total points earned on {formatDateTile(selectedDateKey)}
+          </p>
+
+          <p className="mt-2 text-4xl font-black text-white">
+            {selectedDateTotalPoints}
+          </p>
         </div>
       )}
     </section>
