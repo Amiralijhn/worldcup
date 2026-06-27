@@ -401,9 +401,9 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
             </p>
           </div>
 
-          <div className="rounded-xl bg-green-400 px-4 py-2 text-sm font-black text-slate-950">
+          {/* <div className="rounded-xl bg-green-400 px-4 py-2 text-sm font-black text-slate-950">
             Today
-          </div>
+          </div> */}
         </div>
 
         <div className="mt-4 flex gap-3 overflow-x-auto pb-2">

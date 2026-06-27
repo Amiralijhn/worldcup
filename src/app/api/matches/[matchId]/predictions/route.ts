@@ -70,7 +70,6 @@ export async function GET(
       .map((prediction) => ({
         id: prediction.id,
         playerName: prediction.user.displayName,
-        username: prediction.user.username,
         predTeam1Score: prediction.predTeam1Score,
         predTeam2Score: prediction.predTeam2Score,
         points: prediction.points ?? 0,
