@@ -168,7 +168,7 @@ export default async function DashboardPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-black/20 p-5">
+              {/* <div className="rounded-2xl bg-black/20 p-5">
                 <p className="text-sm text-white/50">
                   Adjustments
                 </p>
@@ -176,7 +176,7 @@ export default async function DashboardPage() {
                 <p className="mt-2 text-4xl font-black">
                   {adjustmentPoints}
                 </p>
-              </div>
+              </div> */}
             </div>
 
             <div className="mt-6 flex flex-wrap gap-3">
