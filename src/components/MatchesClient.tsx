@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type MatchItem = {
   id: number;
@@ -67,6 +67,14 @@ function addDaysToTorontoDateKey(date: Date, days: number) {
   return result.toISOString().slice(0, 10);
 }
 
+function addDaysToDateKey(dateKey: string, days: number) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+
+  const result = new Date(Date.UTC(year, month - 1, day + days));
+
+  return result.toISOString().slice(0, 10);
+}
+
 function formatKickoff(value: string) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Toronto",
@@ -123,21 +131,42 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
   );
 
   const todayKey = getTorontoDateKey(new Date());
+  const finalDateKey = "2026-07-19";
+  const todayTileRef = useRef<HTMLButtonElement | null>(null);
 
   const dateKeys = useMemo(() => {
-    const uniqueDates = new Set<string>();
+    const matchDateKeys = items.map((match) =>
+      getTorontoDateKey(new Date(match.kickoffAt))
+    );
 
-    items.forEach((match) => {
-      uniqueDates.add(getTorontoDateKey(new Date(match.kickoffAt)));
+    const sortedMatchDateKeys = [...matchDateKeys].sort();
+
+    const firstMatchDateKey =
+      sortedMatchDateKeys.length > 0 ? sortedMatchDateKeys[0] : todayKey;
+
+    const startDateKey =
+      firstMatchDateKey < todayKey ? firstMatchDateKey : todayKey;
+
+    const dates: string[] = [];
+    let currentDateKey = startDateKey;
+
+    while (currentDateKey <= finalDateKey) {
+      dates.push(currentDateKey);
+      currentDateKey = addDaysToDateKey(currentDateKey, 1);
+    }
+
+    return dates;
+  }, [items, todayKey]);
+
+  const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
+
+  useEffect(() => {
+    todayTileRef.current?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
     });
-
-    return Array.from(uniqueDates).sort();
-  }, [items]);
-
-  const defaultDateKey =
-    dateKeys.find((dateKey) => dateKey >= todayKey) || dateKeys[0] || "";
-
-  const [selectedDateKey, setSelectedDateKey] = useState(defaultDateKey);
+  }, []);
 
   const selectedDateMatches = useMemo(() => {
     return items.filter((match) => {
@@ -172,6 +201,12 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
       (sum, match) => sum + (match.prediction?.points ?? 0),
       0
     );
+  }
+
+  function getDateMatchCount(dateKey: string) {
+    return items.filter(
+      (match) => getTorontoDateKey(new Date(match.kickoffAt)) === dateKey
+    ).length;
   }
 
   function updateLocalPrediction(
@@ -298,22 +333,38 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
       </div>
 
       <div className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-5">
-        <h3 className="text-xl font-black">Choose Date</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-black">Choose Date</h3>
+
+            <p className="mt-1 text-sm text-white/60">
+              Today is selected by default. Previous dates are on the left, and
+              future dates continue to July 19, 2026.
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-green-400 px-4 py-2 text-sm font-black text-slate-950">
+            Today
+          </div>
+        </div>
 
         <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
           {dateKeys.map((dateKey) => {
             const isSelected = selectedDateKey === dateKey;
             const isPast = dateKey < todayKey;
             const isToday = dateKey === todayKey;
-            const isTomorrow = dateKey === addDaysToTorontoDateKey(new Date(), 1);
+            const isTomorrow =
+              dateKey === addDaysToTorontoDateKey(new Date(), 1);
             const totalPoints = getDatePoints(dateKey);
+            const matchCount = getDateMatchCount(dateKey);
 
             return (
               <button
                 key={dateKey}
+                ref={dateKey === todayKey ? todayTileRef : null}
                 type="button"
                 onClick={() => setSelectedDateKey(dateKey)}
-                className={`min-w-[130px] rounded-2xl border p-4 text-left transition ${
+                className={`min-w-[135px] rounded-2xl border p-4 text-left transition ${
                   isSelected
                     ? "border-green-400 bg-green-400 text-slate-950"
                     : "border-white/10 bg-black/20 text-white hover:bg-white/10"
@@ -333,6 +384,14 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                     : isPast
                     ? "Past"
                     : "Upcoming"}
+                </p>
+
+                <p
+                  className={`mt-2 text-xs ${
+                    isSelected ? "text-slate-800" : "text-white/50"
+                  }`}
+                >
+                  {matchCount} match{matchCount === 1 ? "" : "es"}
                 </p>
 
                 {isPast && (
@@ -373,7 +432,8 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
           {selectedDateMatches.map((match) => {
             const kickoff = new Date(match.kickoffAt);
 
-            const locked = kickoff <= new Date() || match.status === "FINISHED";
+            const locked =
+              kickoff <= new Date() || match.status === "FINISHED";
 
             const today = isMatchToday(match.kickoffAt);
             const tomorrow = isMatchTomorrow(match.kickoffAt);
