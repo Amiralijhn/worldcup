@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type AdminPrediction = {
   id: number;
@@ -31,15 +31,6 @@ type AdminMatchesClientProps = {
   matches: AdminMatch[];
 };
 
-type TimeFilter =
-  | "next24"
-  | "today"
-  | "tomorrow"
-  | "thisWeek"
-  | "future"
-  | "previous"
-  | "all";
-
 type PredictionRowProps = {
   prediction: AdminPrediction;
   onSave: (
@@ -50,16 +41,16 @@ type PredictionRowProps = {
   ) => Promise<void>;
 };
 
-const stages = [
-  "All",
-  "Group Stage",
-  "1/32",
-  "1/16",
-  "1/8",
-  "1/4",
-  "1/2 Final",
-  "Playoff",
-  "Final",
+const stageFilters = [
+  { label: "All Games", value: "All" },
+  { label: "Group Stage", value: "Group Stage" },
+  { label: "1/32", value: "1/32" },
+  { label: "1/16", value: "1/16" },
+  { label: "1/8", value: "1/8" },
+  { label: "1/4", value: "1/4" },
+  { label: "1/2", value: "1/2 Final" },
+  { label: "Playoff", value: "Playoff" },
+  { label: "Final", value: "Final" },
 ];
 
 function getTorontoDateParts(date: Date) {
@@ -86,32 +77,20 @@ function getTorontoDateKey(date: Date) {
   )}`;
 }
 
-function addDaysToTorontoDateKey(date: Date, numberOfDays: number) {
+function addDaysToTorontoDateKey(date: Date, days: number) {
   const { year, month, day } = getTorontoDateParts(date);
 
-  const result = new Date(
-    Date.UTC(year, month - 1, day + numberOfDays)
-  );
+  const result = new Date(Date.UTC(year, month - 1, day + days));
 
   return result.toISOString().slice(0, 10);
 }
 
-function getEndOfWeekDateKey(date: Date) {
-  const { year, month, day } = getTorontoDateParts(date);
+function addDaysToDateKey(dateKey: string, days: number) {
+  const [year, month, day] = dateKey.split("-").map(Number);
 
-  const temporaryDate = new Date(
-    Date.UTC(year, month - 1, day)
-  );
+  const result = new Date(Date.UTC(year, month - 1, day + days));
 
-  const dayOfWeek = temporaryDate.getUTCDay();
-  const daysUntilSunday =
-    dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
-
-  temporaryDate.setUTCDate(
-    temporaryDate.getUTCDate() + daysUntilSunday
-  );
-
-  return temporaryDate.toISOString().slice(0, 10);
+  return result.toISOString().slice(0, 10);
 }
 
 function formatKickoff(value: string) {
@@ -126,6 +105,52 @@ function formatKickoff(value: string) {
   }).format(new Date(value));
 }
 
+function formatDateTile(dateKey: string) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+
+  return new Intl.DateTimeFormat("en-CA", {
+    month: "short",
+    day: "2-digit",
+  }).format(date);
+}
+
+function formatDateTitle(dateKey: string) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+
+  return new Intl.DateTimeFormat("en-CA", {
+    weekday: "long",
+    month: "long",
+    day: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatDateTimeLocal(value: string) {
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60 * 1000);
+
+  return localDate.toISOString().slice(0, 16);
+}
+
+function selectedDateDefaultTime(dateKey: string) {
+  return `${dateKey}T15:00`;
+}
+
+function isMatchToday(kickoffAt: string) {
+  return (
+    getTorontoDateKey(new Date(kickoffAt)) ===
+    getTorontoDateKey(new Date())
+  );
+}
+
+function isMatchTomorrow(kickoffAt: string) {
+  return (
+    getTorontoDateKey(new Date(kickoffAt)) ===
+    addDaysToTorontoDateKey(new Date(), 1)
+  );
+}
+
 export default function AdminMatchesClient({
   matches,
 }: AdminMatchesClientProps) {
@@ -133,90 +158,133 @@ export default function AdminMatchesClient({
   const [selectedMatchId, setSelectedMatchId] =
     useState<number | null>(null);
 
-  const [timeFilter, setTimeFilter] =
-    useState<TimeFilter>("all");
+  const [selectedStageFilter, setSelectedStageFilter] =
+    useState<string | null>(null);
 
-  const [stageFilter, setStageFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<
-    "success" | "error"
-  >("success");
+  const [messageType, setMessageType] = useState<"success" | "error">(
+    "success"
+  );
 
-  const filteredMatches = useMemo(() => {
-    const now = new Date();
+  const todayKey = getTorontoDateKey(new Date());
+  const finalDateKey = "2026-07-19";
+  const todayTileRef = useRef<HTMLButtonElement | null>(null);
 
-    const next24Hours = new Date(
-      now.getTime() + 24 * 60 * 60 * 1000
+  const dateKeys = useMemo(() => {
+    const matchDateKeys = items.map((match) =>
+      getTorontoDateKey(new Date(match.kickoffAt))
     );
 
-    const todayKey = getTorontoDateKey(now);
-    const tomorrowKey = addDaysToTorontoDateKey(now, 1);
-    const endOfWeekKey = getEndOfWeekDateKey(now);
+    const sortedMatchDateKeys = [...matchDateKeys].sort();
 
+    const firstMatchDateKey =
+      sortedMatchDateKeys.length > 0 ? sortedMatchDateKeys[0] : todayKey;
+
+    const startDateKey =
+      firstMatchDateKey < todayKey ? firstMatchDateKey : todayKey;
+
+    const dates: string[] = [];
+    let currentDateKey = startDateKey;
+
+    while (currentDateKey <= finalDateKey) {
+      dates.push(currentDateKey);
+      currentDateKey = addDaysToDateKey(currentDateKey, 1);
+    }
+
+    return dates;
+  }, [items, todayKey]);
+
+  const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
+
+  const dateModeIsActive = selectedStageFilter === null;
+
+  useEffect(() => {
+    todayTileRef.current?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, []);
+
+  function scrollToToday() {
+    setSelectedStageFilter(null);
+    setSelectedDateKey(todayKey);
+
+    setTimeout(() => {
+      todayTileRef.current?.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
+    }, 50);
+  }
+
+  function selectDate(dateKey: string) {
+    setSelectedStageFilter(null);
+    setSelectedDateKey(dateKey);
+    setSelectedMatchId(null);
+  }
+
+  function selectStageFilter(stageValue: string) {
+    setSelectedStageFilter(stageValue);
+    setSelectedMatchId(null);
+  }
+
+  const selectedMatches = useMemo(() => {
     return items.filter((match) => {
-      const kickoff = new Date(match.kickoffAt);
-      const kickoffDateKey = getTorontoDateKey(kickoff);
+      const matchDateKey = getTorontoDateKey(new Date(match.kickoffAt));
 
       const searchMatches =
         `${match.matchNumber} ${match.team1} ${match.team2}`
           .toLowerCase()
           .includes(search.trim().toLowerCase());
 
-      const stageMatches =
-        stageFilter === "All" ||
-        match.stage === stageFilter;
-
-      const isPrevious =
-        kickoff < now || match.status === "FINISHED";
-
-      let timeMatches = false;
-
-      switch (timeFilter) {
-        case "next24":
-          timeMatches =
-            kickoff >= now &&
-            kickoff <= next24Hours &&
-            match.status !== "FINISHED";
-          break;
-
-        case "today":
-          timeMatches = kickoffDateKey === todayKey;
-          break;
-
-        case "tomorrow":
-          timeMatches = kickoffDateKey === tomorrowKey;
-          break;
-
-        case "thisWeek":
-          timeMatches =
-            kickoff >= now &&
-            kickoffDateKey <= endOfWeekKey &&
-            match.status !== "FINISHED";
-          break;
-
-        case "future":
-          timeMatches =
-            kickoff > now &&
-            match.status !== "FINISHED";
-          break;
-
-        case "previous":
-          timeMatches = isPrevious;
-          break;
-
-        case "all":
-          timeMatches = true;
-          break;
+      if (!searchMatches) {
+        return false;
       }
 
-      return (
-        searchMatches &&
-        stageMatches &&
-        timeMatches
-      );
+      if (selectedStageFilter !== null) {
+        if (selectedStageFilter === "All") {
+          return true;
+        }
+
+        return match.stage === selectedStageFilter;
+      }
+
+      return matchDateKey === selectedDateKey;
     });
-  }, [items, search, stageFilter, timeFilter]);
+  }, [items, search, selectedDateKey, selectedStageFilter]);
+
+  function getDateMatchCount(dateKey: string) {
+    return items.filter(
+      (match) => getTorontoDateKey(new Date(match.kickoffAt)) === dateKey
+    ).length;
+  }
+
+  function getCurrentHeading() {
+    if (selectedStageFilter !== null) {
+      const filter = stageFilters.find(
+        (stage) => stage.value === selectedStageFilter
+      );
+
+      return filter?.label || "Matches";
+    }
+
+    return selectedDateKey ? formatDateTitle(selectedDateKey) : "Selected Date";
+  }
+
+  function getCurrentDescription() {
+    if (selectedStageFilter !== null) {
+      if (selectedStageFilter === "All") {
+        return "Showing all games, no matter the date.";
+      }
+
+      return "Showing all games in this stage, no matter the date.";
+    }
+
+    return "Showing matches for the selected date.";
+  }
 
   async function updatePrediction(
     predictionId: number,
@@ -227,69 +295,232 @@ export default function AdminMatchesClient({
     setMessage("");
 
     try {
-      const response = await fetch(
-        "/api/admin/prediction-points",
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            predictionId,
-            predTeam1Score,
-            predTeam2Score,
-            points,
-          }),
-        }
-      );
+      const response = await fetch("/api/admin/prediction-points", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          predictionId,
+          predTeam1Score,
+          predTeam2Score,
+          points,
+        }),
+      });
 
-      const text = await response.text();
-
-      let data: {
-        error?: string;
-        message?: string;
-      } = {};
-
-      if (text) {
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = {
-            error: "The server returned an invalid response.",
-          };
-        }
-      }
+      const data = await response.json();
 
       if (!response.ok) {
         setMessageType("error");
-        setMessage(
-          data.error || "Could not update prediction."
-        );
+        setMessage(data.error || "Could not update prediction.");
         return;
       }
 
       setItems((currentItems) =>
         currentItems.map((match) => ({
           ...match,
-          predictions: match.predictions.map(
-            (prediction) =>
-              prediction.id === predictionId
-                ? {
-                    ...prediction,
-                    predTeam1Score,
-                    predTeam2Score,
-                    points,
-                  }
-                : prediction
+          predictions: match.predictions.map((prediction) =>
+            prediction.id === predictionId
+              ? {
+                  ...prediction,
+                  predTeam1Score,
+                  predTeam2Score,
+                  points,
+                }
+              : prediction
           ),
         }))
       );
 
       setMessageType("success");
-      setMessage(
-        data.message ||
-          "Prediction updated successfully."
+      setMessage(data.message || "Prediction updated successfully.");
+    } catch {
+      setMessageType("error");
+      setMessage("Unable to connect to the server.");
+    }
+  }
+
+  async function updateFinalResult(
+    matchId: number,
+    actualTeam1Score: number,
+    actualTeam2Score: number
+  ) {
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/match-result", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          matchId,
+          actualTeam1Score,
+          actualTeam2Score,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessageType("error");
+        setMessage(data.error || "Could not update final result.");
+        return;
+      }
+
+      setItems((currentItems) =>
+        currentItems.map((match) =>
+          match.id === matchId
+            ? {
+                ...match,
+                actualTeam1Score: data.match.actualTeam1Score,
+                actualTeam2Score: data.match.actualTeam2Score,
+                status: data.match.status,
+              }
+            : match
+        )
       );
+
+      setMessageType("success");
+      setMessage(
+        "Final result updated. Prediction points were recalculated."
+      );
+    } catch {
+      setMessageType("error");
+      setMessage("Unable to connect to the server.");
+    }
+  }
+
+  async function createMatch(newMatch: {
+    matchNumber: number;
+    team1: string;
+    team2: string;
+    stage: string;
+    kickoffAt: string;
+  }) {
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/matches", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newMatch),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessageType("error");
+        setMessage(data.error || "Could not add match.");
+        return;
+      }
+
+      setItems((currentItems) =>
+        [
+          ...currentItems,
+          {
+            ...data.match,
+            kickoffAt: data.match.kickoffAt,
+            predictions: [],
+          },
+        ].sort((a, b) => a.matchNumber - b.matchNumber)
+      );
+
+      setMessageType("success");
+      setMessage(data.message || "Match added successfully.");
+    } catch {
+      setMessageType("error");
+      setMessage("Unable to connect to the server.");
+    }
+  }
+
+  async function updateMatch(
+    matchId: number,
+    updatedMatchData: {
+      matchNumber: number;
+      team1: string;
+      team2: string;
+      stage: string;
+      kickoffAt: string;
+    }
+  ) {
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/admin/matches/${matchId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedMatchData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessageType("error");
+        setMessage(data.error || "Could not update match.");
+        return;
+      }
+
+      setItems((currentItems) =>
+        currentItems
+          .map((match) =>
+            match.id === matchId
+              ? {
+                  ...match,
+                  matchNumber: data.match.matchNumber,
+                  team1: data.match.team1,
+                  team2: data.match.team2,
+                  stage: data.match.stage,
+                  kickoffAt: data.match.kickoffAt,
+                }
+              : match
+          )
+          .sort((a, b) => a.matchNumber - b.matchNumber)
+      );
+
+      setMessageType("success");
+      setMessage(data.message || "Match updated successfully.");
+    } catch {
+      setMessageType("error");
+      setMessage("Unable to connect to the server.");
+    }
+  }
+
+  async function deleteMatch(matchId: number) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this match? This also deletes predictions for this match."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/admin/matches/${matchId}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessageType("error");
+        setMessage(data.error || "Could not delete match.");
+        return;
+      }
+
+      setItems((currentItems) =>
+        currentItems.filter((match) => match.id !== matchId)
+      );
+
+      setSelectedMatchId(null);
+      setMessageType("success");
+      setMessage(data.message || "Match deleted successfully.");
     } catch {
       setMessageType("error");
       setMessage("Unable to connect to the server.");
@@ -298,15 +529,25 @@ export default function AdminMatchesClient({
 
   return (
     <section>
-      <div className="rounded-3xl border border-white/10 bg-white/10 p-5">
-        <h1 className="text-3xl font-black">
-          Admin Match Management
-        </h1>
+      <div className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-black">Admin Match Management</h1>
 
-        <p className="mt-2 text-white/60">
-          Filter matches, review user predictions, and adjust
-          predicted scores and points.
-        </p>
+            <p className="mt-2 text-white/60">
+              Add, edit, delete matches, update final results, and review user
+              predictions.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={scrollToToday}
+            className="rounded-xl bg-green-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-green-300"
+          >
+            Today
+          </button>
+        </div>
 
         {message && (
           <p
@@ -320,65 +561,130 @@ export default function AdminMatchesClient({
           </p>
         )}
 
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <div className="mt-5">
           <input
             value={search}
-            onChange={(event) =>
-              setSearch(event.target.value)
-            }
+            onChange={(event) => setSearch(event.target.value)}
             placeholder="Search team or match number"
-            className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
+            className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
           />
+        </div>
 
-          <select
-            value={timeFilter}
-            onChange={(event) =>
-              setTimeFilter(
-                event.target.value as TimeFilter
-              )
-            }
-            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-          >
-            <option value="next24">Next 24 Hours</option>
-            <option value="today">Today</option>
-            <option value="tomorrow">Tomorrow</option>
-            <option value="thisWeek">This Week</option>
-            <option value="future">Future</option>
-            <option value="previous">Previous</option>
-            <option value="all">All Matches</option>
-          </select>
+        <div className="mt-5">
+          <h2 className="text-xl font-black">Filter by Stage</h2>
 
-          <select
-            value={stageFilter}
-            onChange={(event) =>
-              setStageFilter(event.target.value)
-            }
-            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-          >
-            {stages.map((stage) => (
-              <option key={stage} value={stage}>
-                {stage}
-              </option>
-            ))}
-          </select>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {stageFilters.map((stage) => {
+              const isActive = selectedStageFilter === stage.value;
+
+              return (
+                <button
+                  key={stage.value}
+                  type="button"
+                  onClick={() => selectStageFilter(stage.value)}
+                  className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+                    isActive
+                      ? "bg-yellow-400 text-slate-950"
+                      : "bg-white/10 text-white hover:bg-white/20"
+                  }`}
+                >
+                  {stage.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <h2 className="text-xl font-black">Choose Date</h2>
+
+          <p className="mt-1 text-sm text-white/60">
+            Click a date to manage the games on that date.
+          </p>
+
+          <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+            {dateKeys.map((dateKey) => {
+              const isSelected = dateModeIsActive && selectedDateKey === dateKey;
+              const isPast = dateKey < todayKey;
+              const isToday = dateKey === todayKey;
+              const isTomorrow =
+                dateKey === addDaysToTorontoDateKey(new Date(), 1);
+              const matchCount = getDateMatchCount(dateKey);
+
+              return (
+                <button
+                  key={dateKey}
+                  ref={dateKey === todayKey ? todayTileRef : null}
+                  type="button"
+                  onClick={() => selectDate(dateKey)}
+                  className={`min-w-[135px] rounded-2xl border p-4 text-left transition ${
+                    isSelected
+                      ? "border-green-400 bg-green-400 text-slate-950"
+                      : "border-white/10 bg-black/20 text-white hover:bg-white/10"
+                  }`}
+                >
+                  <p className="text-lg font-black">{formatDateTile(dateKey)}</p>
+
+                  <p
+                    className={`mt-1 text-xs font-bold ${
+                      isSelected ? "text-slate-800" : "text-white/50"
+                    }`}
+                  >
+                    {isToday
+                      ? "Today"
+                      : isTomorrow
+                      ? "Tomorrow"
+                      : isPast
+                      ? "Past"
+                      : "Upcoming"}
+                  </p>
+
+                  <p
+                    className={`mt-2 text-xs ${
+                      isSelected ? "text-slate-800" : "text-white/50"
+                    }`}
+                  >
+                    {matchCount} match{matchCount === 1 ? "" : "es"}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {filteredMatches.length === 0 ? (
+      <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
+        <h2 className="font-black text-green-300">{getCurrentHeading()}</h2>
+
+        <p className="mt-1 text-sm text-white/60">
+          {getCurrentDescription()}
+        </p>
+      </div>
+
+      {dateModeIsActive && (
+        <AddMatchForm
+          selectedDateKey={selectedDateKey}
+          onCreate={createMatch}
+        />
+      )}
+
+      {selectedMatches.length === 0 ? (
         <div className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-8 text-center">
-          <h2 className="text-xl font-black">
-            No matches found
-          </h2>
+          <h2 className="text-xl font-black">No matches found</h2>
 
           <p className="mt-2 text-sm text-white/60">
-            Try changing the filters or search text.
+            Try changing the date, stage filter, or search text.
           </p>
         </div>
       ) : (
         <div className="mt-6 grid gap-4">
-          {filteredMatches.map((match) => {
-            const isSelected =
-              selectedMatchId === match.id;
+          {selectedMatches.map((match) => {
+            const isSelected = selectedMatchId === match.id;
+            const today = isMatchToday(match.kickoffAt);
+            const tomorrow = isMatchTomorrow(match.kickoffAt);
+            const hasResult =
+              match.actualTeam1Score !== null &&
+              match.actualTeam2Score !== null;
 
             return (
               <div
@@ -388,85 +694,99 @@ export default function AdminMatchesClient({
                 <button
                   type="button"
                   onClick={() =>
-                    setSelectedMatchId(
-                      isSelected ? null : match.id
-                    )
+                    setSelectedMatchId(isSelected ? null : match.id)
                   }
                   className="w-full p-5 text-left transition hover:bg-white/5"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-bold text-green-300">
-                        Match {match.matchNumber} ·{" "}
-                        {match.stage}
+                        Match {match.matchNumber} · {match.stage}
                       </p>
 
                       <h2 className="mt-1 text-2xl font-black">
                         {match.team1} vs {match.team2}
                       </h2>
 
-                      <p className="mt-1 text-sm text-white/60">
-                        {formatKickoff(match.kickoffAt)}
-                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <p className="text-sm text-white/60">
+                          {formatKickoff(match.kickoffAt)}
+                        </p>
+
+                        {today && (
+                          <span className="rounded-full bg-green-400 px-2 py-1 text-xs font-black text-slate-950">
+                            Today
+                          </span>
+                        )}
+
+                        {tomorrow && (
+                          <span className="rounded-full bg-blue-400 px-2 py-1 text-xs font-black text-slate-950">
+                            Tomorrow
+                          </span>
+                        )}
+                      </div>
 
                       <p className="mt-2 text-sm text-white/50">
-                        {match.predictions.length} submitted{" "}
-                        prediction
-                        {match.predictions.length === 1
-                          ? ""
-                          : "s"}
+                        {match.predictions.length} submitted prediction
+                        {match.predictions.length === 1 ? "" : "s"}
                       </p>
                     </div>
 
                     <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
-                      {isSelected
-                        ? "Hide predictions"
-                        : "View predictions"}
+                      {isSelected ? "Hide details" : "Manage match"}
                     </span>
                   </div>
                 </button>
 
                 {isSelected && (
-                  <div className="border-t border-white/10 p-5">
-                    {match.predictions.length === 0 ? (
-                      <p className="text-sm text-white/60">
-                        No users have submitted predictions
-                        for this match.
-                      </p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[760px] text-left text-sm">
-                          <thead className="border-b border-white/10 text-white/50">
-                            <tr>
-                              <th className="p-3">Player</th>
-                              <th className="p-3">Username</th>
-                              <th className="p-3">
-                                Predicted Score
-                              </th>
-                              <th className="p-3">
-                                Current Points
-                              </th>
-                              <th className="p-3">
-                                New Points
-                              </th>
-                              <th className="p-3">Save</th>
-                            </tr>
-                          </thead>
+                  <div className="grid gap-5 border-t border-white/10 p-5">
+                    <FinalResultForm
+                      match={match}
+                      onSave={updateFinalResult}
+                    />
 
-                          <tbody>
-                            {match.predictions.map(
-                              (prediction) => (
+                    <EditMatchForm
+                      match={match}
+                      onSave={updateMatch}
+                      onDelete={deleteMatch}
+                    />
+
+                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                      <h3 className="text-xl font-black">
+                        User Predictions
+                      </h3>
+
+                      {match.predictions.length === 0 ? (
+                        <p className="mt-3 text-sm text-white/60">
+                          No users have submitted predictions for this match.
+                        </p>
+                      ) : (
+                        <div className="mt-4 overflow-x-auto">
+                          <table className="w-full min-w-[760px] text-left text-sm">
+                            <thead className="border-b border-white/10 text-white/50">
+                              <tr>
+                                <th className="p-3">Player</th>
+                                <th className="p-3">Username</th>
+                                <th className="p-3">Predicted Score</th>
+                                <th className="p-3">Current Points</th>
+                                <th className="p-3">New Points</th>
+                                <th className="p-3">Save</th>
+                              </tr>
+                            </thead>
+
+                            <tbody>
+                              {match.predictions.map((prediction) => (
                                 <PredictionRow
                                   key={prediction.id}
                                   prediction={prediction}
                                   onSave={updatePrediction}
                                 />
-                              )
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -478,10 +798,312 @@ export default function AdminMatchesClient({
   );
 }
 
-function PredictionRow({
-  prediction,
+function AddMatchForm({
+  selectedDateKey,
+  onCreate,
+}: {
+  selectedDateKey: string;
+  onCreate: (newMatch: {
+    matchNumber: number;
+    team1: string;
+    team2: string;
+    stage: string;
+    kickoffAt: string;
+  }) => Promise<void>;
+}) {
+  const [matchNumber, setMatchNumber] = useState(0);
+  const [team1, setTeam1] = useState("");
+  const [team2, setTeam2] = useState("");
+  const [stage, setStage] = useState("Group Stage");
+  const [kickoffAt, setKickoffAt] = useState(
+    selectedDateDefaultTime(selectedDateKey)
+  );
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setKickoffAt(selectedDateDefaultTime(selectedDateKey));
+  }, [selectedDateKey]);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+
+    setSaving(true);
+
+    try {
+      await onCreate({
+        matchNumber,
+        team1,
+        team2,
+        stage,
+        kickoffAt: new Date(kickoffAt).toISOString(),
+      });
+
+      setMatchNumber(0);
+      setTeam1("");
+      setTeam2("");
+      setStage("Group Stage");
+      setKickoffAt(selectedDateDefaultTime(selectedDateKey));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-3xl border border-orange-400/30 bg-orange-500/10 p-5"
+    >
+      <h2 className="text-xl font-black text-orange-300">
+        Add Match on {formatDateTile(selectedDateKey)}
+      </h2>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-5">
+        <input
+          type="number"
+          min="1"
+          value={matchNumber}
+          onChange={(event) => setMatchNumber(Number(event.target.value))}
+          placeholder="Match #"
+          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+        />
+
+        <input
+          value={team1}
+          onChange={(event) => setTeam1(event.target.value)}
+          placeholder="Team 1"
+          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+        />
+
+        <input
+          value={team2}
+          onChange={(event) => setTeam2(event.target.value)}
+          placeholder="Team 2"
+          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+        />
+
+        <select
+          value={stage}
+          onChange={(event) => setStage(event.target.value)}
+          className="rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-white outline-none"
+        >
+          {stageFilters
+            .filter((item) => item.value !== "All")
+            .map((stageItem) => (
+              <option key={stageItem.value} value={stageItem.value}>
+                {stageItem.label}
+              </option>
+            ))}
+        </select>
+
+        <input
+          type="datetime-local"
+          value={kickoffAt}
+          onChange={(event) => setKickoffAt(event.target.value)}
+          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={saving}
+        className="mt-4 rounded-xl bg-orange-500 px-5 py-3 font-black text-white transition hover:bg-orange-400 disabled:opacity-50"
+      >
+        {saving ? "Adding..." : "Add Match"}
+      </button>
+    </form>
+  );
+}
+
+function FinalResultForm({
+  match,
   onSave,
-}: PredictionRowProps) {
+}: {
+  match: AdminMatch;
+  onSave: (
+    matchId: number,
+    actualTeam1Score: number,
+    actualTeam2Score: number
+  ) => Promise<void>;
+}) {
+  const [team1Score, setTeam1Score] = useState(match.actualTeam1Score ?? 0);
+  const [team2Score, setTeam2Score] = useState(match.actualTeam2Score ?? 0);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+
+    try {
+      await onSave(match.id, team1Score, team2Score);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
+      <h3 className="text-xl font-black text-green-300">Final Result</h3>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <span className="font-bold">{match.team1}</span>
+
+        <input
+          type="number"
+          min="0"
+          value={team1Score}
+          onChange={(event) => setTeam1Score(Number(event.target.value))}
+          className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
+        />
+
+        <span className="font-black">-</span>
+
+        <input
+          type="number"
+          min="0"
+          value={team2Score}
+          onChange={(event) => setTeam2Score(Number(event.target.value))}
+          className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
+        />
+
+        <span className="font-bold">{match.team2}</span>
+
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-lg bg-green-400 px-4 py-2 font-black text-slate-950 transition hover:bg-green-300 disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save Result"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EditMatchForm({
+  match,
+  onSave,
+  onDelete,
+}: {
+  match: AdminMatch;
+  onSave: (
+    matchId: number,
+    updatedMatchData: {
+      matchNumber: number;
+      team1: string;
+      team2: string;
+      stage: string;
+      kickoffAt: string;
+    }
+  ) => Promise<void>;
+  onDelete: (matchId: number) => Promise<void>;
+}) {
+  const [matchNumber, setMatchNumber] = useState(match.matchNumber);
+  const [team1, setTeam1] = useState(match.team1);
+  const [team2, setTeam2] = useState(match.team2);
+  const [stage, setStage] = useState(match.stage);
+  const [kickoffAt, setKickoffAt] = useState(
+    formatDateTimeLocal(match.kickoffAt)
+  );
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+
+    try {
+      await onSave(match.id, {
+        matchNumber,
+        team1,
+        team2,
+        stage,
+        kickoffAt: new Date(kickoffAt).toISOString(),
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+
+    try {
+      await onDelete(match.id);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <h3 className="text-xl font-black">Edit Match</h3>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-5">
+        <input
+          type="number"
+          min="1"
+          value={matchNumber}
+          onChange={(event) => setMatchNumber(Number(event.target.value))}
+          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+        />
+
+        <input
+          value={team1}
+          onChange={(event) => setTeam1(event.target.value)}
+          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+        />
+
+        <input
+          value={team2}
+          onChange={(event) => setTeam2(event.target.value)}
+          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+        />
+
+        <select
+          value={stage}
+          onChange={(event) => setStage(event.target.value)}
+          className="rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-white outline-none"
+        >
+          {stageFilters
+            .filter((item) => item.value !== "All")
+            .map((stageItem) => (
+              <option key={stageItem.value} value={stageItem.value}>
+                {stageItem.label}
+              </option>
+            ))}
+        </select>
+
+        <input
+          type="datetime-local"
+          value={kickoffAt}
+          onChange={(event) => setKickoffAt(event.target.value)}
+          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-lg bg-green-400 px-4 py-2 font-black text-slate-950 transition hover:bg-green-300 disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save Match"}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="rounded-lg bg-red-500 px-4 py-2 font-black text-white transition hover:bg-red-400 disabled:opacity-50"
+        >
+          {deleting ? "Deleting..." : "Delete Match"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PredictionRow({ prediction, onSave }: PredictionRowProps) {
   const [predTeam1Score, setPredTeam1Score] = useState(
     prediction.predTeam1Score
   );
@@ -490,10 +1112,7 @@ function PredictionRow({
     prediction.predTeam2Score
   );
 
-  const [points, setPoints] = useState(
-    prediction.points ?? 0
-  );
-
+  const [points, setPoints] = useState(prediction.points ?? 0);
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -513,13 +1132,9 @@ function PredictionRow({
 
   return (
     <tr className="border-b border-white/10">
-      <td className="p-3 font-bold">
-        {prediction.user.displayName}
-      </td>
+      <td className="p-3 font-bold">{prediction.user.displayName}</td>
 
-      <td className="p-3 text-white/60">
-        {prediction.user.username}
-      </td>
+      <td className="p-3 text-white/60">{prediction.user.username}</td>
 
       <td className="p-3">
         <div className="flex items-center gap-2">
@@ -528,9 +1143,7 @@ function PredictionRow({
             min="0"
             value={predTeam1Score}
             onChange={(event) =>
-              setPredTeam1Score(
-                Number(event.target.value)
-              )
+              setPredTeam1Score(Number(event.target.value))
             }
             className="w-16 rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-center text-white outline-none"
           />
@@ -542,9 +1155,7 @@ function PredictionRow({
             min="0"
             value={predTeam2Score}
             onChange={(event) =>
-              setPredTeam2Score(
-                Number(event.target.value)
-              )
+              setPredTeam2Score(Number(event.target.value))
             }
             className="w-16 rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-center text-white outline-none"
           />
@@ -559,9 +1170,7 @@ function PredictionRow({
         <input
           type="number"
           value={points}
-          onChange={(event) =>
-            setPoints(Number(event.target.value))
-          }
+          onChange={(event) => setPoints(Number(event.target.value))}
           className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
         />
       </td>
