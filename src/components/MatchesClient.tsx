@@ -181,6 +181,18 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
 
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
 
+  function scrollToToday() {
+    setSelectedDateKey(todayKey);
+
+    setTimeout(() => {
+      todayTileRef.current?.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
+    }, 50);
+  }
+
   useEffect(() => {
     todayTileRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -350,11 +362,23 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
   return (
     <section>
       <div className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-5">
-        <h2 className="text-3xl font-black">Matches</h2>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-black">Matches</h2>
 
-        <p className="mt-2 text-white/60">
-          Select a date to see the matches on that day.
-        </p>
+            <p className="mt-2 text-white/60">
+              Search, filter, and select a date to see the matches on that day.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={scrollToToday}
+            className="rounded-xl bg-green-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-green-300"
+          >
+            Today
+          </button>
+        </div>
 
         {message && (
           <p
@@ -388,82 +412,80 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
             ))}
           </select>
         </div>
-      </div>
 
-      <div className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xl font-black">Choose Date</h3>
+        <div className="mt-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-xl font-black">Choose Date</h3>
 
-            <p className="mt-1 text-sm text-white/60">
-              Today is selected by default. Previous dates are on the left, and
-              future dates continue to July 19, 2026.
-            </p>
+              <p className="mt-1 text-sm text-white/60">
+                Today is selected by default. Previous dates are on the left,
+                and future dates continue to July 19, 2026.
+              </p>
+            </div>
           </div>
 
-          {/* <div className="rounded-xl bg-green-400 px-4 py-2 text-sm font-black text-slate-950">
-            Today
-          </div> */}
-        </div>
+          <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+            {dateKeys.map((dateKey) => {
+              const isSelected = selectedDateKey === dateKey;
+              const isPast = dateKey < todayKey;
+              const isToday = dateKey === todayKey;
+              const isTomorrow =
+                dateKey === addDaysToTorontoDateKey(new Date(), 1);
+              const totalPoints = getDatePoints(dateKey);
+              const matchCount = getDateMatchCount(dateKey);
 
-        <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
-          {dateKeys.map((dateKey) => {
-            const isSelected = selectedDateKey === dateKey;
-            const isPast = dateKey < todayKey;
-            const isToday = dateKey === todayKey;
-            const isTomorrow =
-              dateKey === addDaysToTorontoDateKey(new Date(), 1);
-            const totalPoints = getDatePoints(dateKey);
-            const matchCount = getDateMatchCount(dateKey);
-
-            return (
-              <button
-                key={dateKey}
-                ref={dateKey === todayKey ? todayTileRef : null}
-                type="button"
-                onClick={() => setSelectedDateKey(dateKey)}
-                className={`min-w-[135px] rounded-2xl border p-4 text-left transition ${
-                  isSelected
-                    ? "border-green-400 bg-green-400 text-slate-950"
-                    : "border-white/10 bg-black/20 text-white hover:bg-white/10"
-                }`}
-              >
-                <p className="text-lg font-black">{formatDateTile(dateKey)}</p>
-
-                <p
-                  className={`mt-1 text-xs font-bold ${
-                    isSelected ? "text-slate-800" : "text-white/50"
+              return (
+                <button
+                  key={dateKey}
+                  ref={dateKey === todayKey ? todayTileRef : null}
+                  type="button"
+                  onClick={() => setSelectedDateKey(dateKey)}
+                  className={`min-w-[135px] rounded-2xl border p-4 text-left transition ${
+                    isSelected
+                      ? "border-green-400 bg-green-400 text-slate-950"
+                      : "border-white/10 bg-black/20 text-white hover:bg-white/10"
                   }`}
                 >
-                  {isToday
-                    ? "Today"
-                    : isTomorrow
-                    ? "Tomorrow"
-                    : isPast
-                    ? "Past"
-                    : "Upcoming"}
-                </p>
+                  <p className="text-lg font-black">
+                    {formatDateTile(dateKey)}
+                  </p>
 
-                <p
-                  className={`mt-2 text-xs ${
-                    isSelected ? "text-slate-800" : "text-white/50"
-                  }`}
-                >
-                  {matchCount} match{matchCount === 1 ? "" : "es"}
-                </p>
-
-                {isPast && (
                   <p
-                    className={`mt-2 text-xs font-black ${
-                      isSelected ? "text-slate-950" : "text-green-300"
+                    className={`mt-1 text-xs font-bold ${
+                      isSelected ? "text-slate-800" : "text-white/50"
                     }`}
                   >
-                    Points: {totalPoints}
+                    {isToday
+                      ? "Today"
+                      : isTomorrow
+                      ? "Tomorrow"
+                      : isPast
+                      ? "Past"
+                      : "Upcoming"}
                   </p>
-                )}
-              </button>
-            );
-          })}
+
+                  <p
+                    className={`mt-2 text-xs ${
+                      isSelected ? "text-slate-800" : "text-white/50"
+                    }`}
+                  >
+                    {matchCount} match{matchCount === 1 ? "" : "es"}
+                  </p>
+
+                  {isPast && (
+                    <p
+                      className={`mt-2 text-xs font-black ${
+                        isSelected ? "text-slate-950" : "text-green-300"
+                      }`}
+                    >
+                      Points: {totalPoints}
+                    </p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -634,11 +656,12 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                         : "View all predictions"}
                     </button>
 
-                    {predictionsError && openPredictionsMatchId === match.id && (
-                      <p className="mt-3 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">
-                        {predictionsError}
-                      </p>
-                    )}
+                    {predictionsError &&
+                      openPredictionsMatchId === match.id && (
+                        <p className="mt-3 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">
+                          {predictionsError}
+                        </p>
+                      )}
 
                     {openPredictionsMatchId === match.id && (
                       <div className="mt-4">
@@ -648,11 +671,10 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                           </p>
                         ) : otherPredictions[match.id]?.length ? (
                           <div className="overflow-x-auto">
-                            <table className="w-full min-w-[600px] text-left text-sm">
+                            <table className="w-full min-w-[500px] text-left text-sm">
                               <thead className="border-b border-white/10 text-white/50">
                                 <tr>
                                   <th className="p-3">Player</th>
-                                  <th className="p-3">Username</th>
                                   <th className="p-3">Prediction</th>
                                   <th className="p-3">Points</th>
                                 </tr>
@@ -667,10 +689,6 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                                     >
                                       <td className="p-3 font-bold">
                                         {prediction.playerName}
-                                      </td>
-
-                                      <td className="p-3 text-white/60">
-                                        {prediction.username}
                                       </td>
 
                                       <td className="p-3 font-black">
