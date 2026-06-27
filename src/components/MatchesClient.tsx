@@ -19,6 +19,15 @@ type MatchItem = {
   } | null;
 };
 
+type OtherPlayerPrediction = {
+  id: number;
+  playerName: string;
+  username: string;
+  predTeam1Score: number;
+  predTeam2Score: number;
+  points: number;
+};
+
 type MatchesClientProps = {
   matches: MatchItem[];
 };
@@ -129,6 +138,18 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success"
   );
+
+  const [openPredictionsMatchId, setOpenPredictionsMatchId] =
+    useState<number | null>(null);
+
+  const [otherPredictions, setOtherPredictions] = useState<
+    Record<number, OtherPlayerPrediction[]>
+  >({});
+
+  const [loadingPredictionsMatchId, setLoadingPredictionsMatchId] =
+    useState<number | null>(null);
+
+  const [predictionsError, setPredictionsError] = useState("");
 
   const todayKey = getTorontoDateKey(new Date());
   const finalDateKey = "2026-07-19";
@@ -286,6 +307,43 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
     } catch {
       setMessageType("error");
       setMessage("Unable to connect to the server.");
+    }
+  }
+
+  async function toggleOtherPredictions(matchId: number) {
+    setPredictionsError("");
+
+    if (openPredictionsMatchId === matchId) {
+      setOpenPredictionsMatchId(null);
+      return;
+    }
+
+    setOpenPredictionsMatchId(matchId);
+
+    if (otherPredictions[matchId]) {
+      return;
+    }
+
+    setLoadingPredictionsMatchId(matchId);
+
+    try {
+      const response = await fetch(`/api/matches/${matchId}/predictions`);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setPredictionsError(data.error || "Could not load predictions.");
+        return;
+      }
+
+      setOtherPredictions((current) => ({
+        ...current,
+        [matchId]: data.predictions,
+      }));
+    } catch {
+      setPredictionsError("Unable to connect to the server.");
+    } finally {
+      setLoadingPredictionsMatchId(null);
     }
   }
 
@@ -563,6 +621,81 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                     Save
                   </button>
                 </div>
+
+                {locked && hasResult && (
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <button
+                      type="button"
+                      onClick={() => toggleOtherPredictions(match.id)}
+                      className="rounded-xl bg-white/10 px-4 py-3 text-sm font-black text-white transition hover:bg-white/20"
+                    >
+                      {openPredictionsMatchId === match.id
+                        ? "Hide all predictions"
+                        : "View all predictions"}
+                    </button>
+
+                    {predictionsError && openPredictionsMatchId === match.id && (
+                      <p className="mt-3 rounded-xl bg-red-500/20 p-3 text-sm text-red-100">
+                        {predictionsError}
+                      </p>
+                    )}
+
+                    {openPredictionsMatchId === match.id && (
+                      <div className="mt-4">
+                        {loadingPredictionsMatchId === match.id ? (
+                          <p className="text-sm text-white/60">
+                            Loading predictions...
+                          </p>
+                        ) : otherPredictions[match.id]?.length ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[600px] text-left text-sm">
+                              <thead className="border-b border-white/10 text-white/50">
+                                <tr>
+                                  <th className="p-3">Player</th>
+                                  <th className="p-3">Username</th>
+                                  <th className="p-3">Prediction</th>
+                                  <th className="p-3">Points</th>
+                                </tr>
+                              </thead>
+
+                              <tbody>
+                                {otherPredictions[match.id].map(
+                                  (prediction) => (
+                                    <tr
+                                      key={prediction.id}
+                                      className="border-b border-white/10"
+                                    >
+                                      <td className="p-3 font-bold">
+                                        {prediction.playerName}
+                                      </td>
+
+                                      <td className="p-3 text-white/60">
+                                        {prediction.username}
+                                      </td>
+
+                                      <td className="p-3 font-black">
+                                        {prediction.predTeam1Score} -{" "}
+                                        {prediction.predTeam2Score}
+                                      </td>
+
+                                      <td className="p-3 font-black text-green-300">
+                                        {prediction.points}
+                                      </td>
+                                    </tr>
+                                  )
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-white/60">
+                            No players submitted predictions for this match.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
