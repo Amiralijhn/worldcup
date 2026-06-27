@@ -489,15 +489,32 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
         </div>
       </div>
 
-      <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
-        <h3 className="font-black text-green-300">
-          {selectedDateKey ? formatDateTitle(selectedDateKey) : "Selected Date"}
-        </h3>
+    
+    <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
+  <div className="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h3 className="font-black text-green-300">
+        {selectedDateKey ? formatDateTitle(selectedDateKey) : "Selected Date"}
+      </h3>
 
-        <p className="mt-1 text-sm text-white/60">
-          Showing matches for the selected date.
+      <p className="mt-1 text-sm text-white/60">
+        Showing matches for the selected date.
+      </p>
+    </div>
+
+    {selectedDateIsPast && (
+      <div className="rounded-xl bg-black/20 px-5 py-3 text-center">
+        <p className="text-xs font-bold text-white/50">
+          Total points this day
+        </p>
+
+        <p className="mt-1 text-2xl font-black text-green-300">
+          {selectedDateTotalPoints}
         </p>
       </div>
+    )}
+  </div>
+</div>
 
       {selectedDateMatches.length === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-white/10 p-8 text-center">
@@ -720,17 +737,7 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
         </div>
       )}
 
-      {selectedDateIsPast && (
-        <div className="mt-6 rounded-3xl border border-green-400/20 bg-green-400/10 p-5 text-center">
-          <p className="text-sm font-bold text-green-300">
-            Total points earned on {formatDateTile(selectedDateKey)}
-          </p>
-
-          <p className="mt-2 text-4xl font-black text-white">
-            {selectedDateTotalPoints}
-          </p>
-        </div>
-      )}
+      
     </section>
   );
 }
