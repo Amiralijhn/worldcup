@@ -22,7 +22,6 @@ type MatchItem = {
 type OtherPlayerPrediction = {
   id: number;
   playerName: string;
-  username: string;
   predTeam1Score: number;
   predTeam2Score: number;
   points: number;
@@ -32,16 +31,16 @@ type MatchesClientProps = {
   matches: MatchItem[];
 };
 
-const stages = [
-  "All",
-  "Group Stage",
-  "1/32",
-  "1/16",
-  "1/8",
-  "1/4",
-  "1/2 Final",
-  "Playoff",
-  "Final",
+const stageFilters = [
+  { label: "All Games", value: "All" },
+  { label: "Group Stage", value: "Group Stage" },
+  { label: "1/32", value: "1/32" },
+  { label: "1/16", value: "1/16" },
+  { label: "1/8", value: "1/8" },
+  { label: "1/4", value: "1/4" },
+  { label: "1/2", value: "1/2 Final" },
+  { label: "Playoff", value: "Playoff" },
+  { label: "Final", value: "Final" },
 ];
 
 function getTorontoDateParts(date: Date) {
@@ -132,11 +131,14 @@ function isMatchTomorrow(kickoffAt: string) {
 
 export default function MatchesClient({ matches }: MatchesClientProps) {
   const [items, setItems] = useState(matches);
-  const [stageFilter, setStageFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<"success" | "error">(
     "success"
+  );
+
+  const [selectedStageFilter, setSelectedStageFilter] = useState<string | null>(
+    null
   );
 
   const [openPredictionsMatchId, setOpenPredictionsMatchId] =
@@ -181,7 +183,10 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
 
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
 
+  const dateModeIsActive = selectedStageFilter === null;
+
   function scrollToToday() {
+    setSelectedStageFilter(null);
     setSelectedDateKey(todayKey);
 
     setTimeout(() => {
@@ -193,6 +198,15 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
     }, 50);
   }
 
+  function selectDate(dateKey: string) {
+    setSelectedStageFilter(null);
+    setSelectedDateKey(dateKey);
+  }
+
+  function selectStageFilter(stageValue: string) {
+    setSelectedStageFilter(stageValue);
+  }
+
   useEffect(() => {
     todayTileRef.current?.scrollIntoView({
       behavior: "smooth",
@@ -201,29 +215,38 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
     });
   }, []);
 
-  const selectedDateMatches = useMemo(() => {
+  const selectedMatches = useMemo(() => {
     return items.filter((match) => {
       const matchDateKey = getTorontoDateKey(new Date(match.kickoffAt));
-
-      const dateMatch = matchDateKey === selectedDateKey;
 
       const searchMatch =
         `${match.matchNumber} ${match.team1} ${match.team2}`
           .toLowerCase()
           .includes(search.trim().toLowerCase());
 
-      const stageMatch = stageFilter === "All" || match.stage === stageFilter;
+      if (!searchMatch) {
+        return false;
+      }
 
-      return dateMatch && searchMatch && stageMatch;
+      if (selectedStageFilter !== null) {
+        if (selectedStageFilter === "All") {
+          return true;
+        }
+
+        return match.stage === selectedStageFilter;
+      }
+
+      return matchDateKey === selectedDateKey;
     });
-  }, [items, selectedDateKey, search, stageFilter]);
+  }, [items, selectedDateKey, selectedStageFilter, search]);
 
   const selectedDateIsPast = selectedDateKey < todayKey;
 
-  const selectedDateTotalPoints = selectedDateMatches.reduce(
-    (sum, match) => sum + (match.prediction?.points ?? 0),
-    0
-  );
+  const selectedDateTotalPoints = items
+    .filter(
+      (match) => getTorontoDateKey(new Date(match.kickoffAt)) === selectedDateKey
+    )
+    .reduce((sum, match) => sum + (match.prediction?.points ?? 0), 0);
 
   function getDatePoints(dateKey: string) {
     const matchesOnDate = items.filter(
@@ -240,6 +263,28 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
     return items.filter(
       (match) => getTorontoDateKey(new Date(match.kickoffAt)) === dateKey
     ).length;
+  }
+
+  function getCurrentHeading() {
+    if (selectedStageFilter !== null) {
+      const filter = stageFilters.find((stage) => stage.value === selectedStageFilter);
+
+      return filter?.label || "Matches";
+    }
+
+    return selectedDateKey ? formatDateTitle(selectedDateKey) : "Selected Date";
+  }
+
+  function getCurrentDescription() {
+    if (selectedStageFilter !== null) {
+      if (selectedStageFilter === "All") {
+        return "Showing all games, no matter the date.";
+      }
+
+      return "Showing all games in this stage, no matter the date.";
+    }
+
+    return "Showing matches for the selected date.";
   }
 
   function updateLocalPrediction(
@@ -367,7 +412,7 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
             <h2 className="text-3xl font-black">Matches</h2>
 
             <p className="mt-2 text-white/60">
-              Search, filter, and select a date to see the matches on that day.
+              Search, filter by stage, or select a date to see matches.
             </p>
           </div>
 
@@ -392,25 +437,38 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
           </p>
         )}
 
-        <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <div className="mt-5">
           <input
-            className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
+            className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
             placeholder="Search team or match number"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+        </div>
 
-          <select
-            className="rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
-            value={stageFilter}
-            onChange={(event) => setStageFilter(event.target.value)}
-          >
-            {stages.map((stage) => (
-              <option key={stage} value={stage}>
-                {stage}
-              </option>
-            ))}
-          </select>
+        <div className="mt-5">
+          <h3 className="text-xl font-black">Filter by Stage</h3>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {stageFilters.map((stage) => {
+              const isActive = selectedStageFilter === stage.value;
+
+              return (
+                <button
+                  key={stage.value}
+                  type="button"
+                  onClick={() => selectStageFilter(stage.value)}
+                  className={`rounded-xl px-4 py-2 text-sm font-black transition ${
+                    isActive
+                      ? "bg-yellow-400 text-slate-950"
+                      : "bg-white/10 text-white hover:bg-white/20"
+                  }`}
+                >
+                  {stage.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="mt-6">
@@ -419,15 +477,15 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
               <h3 className="text-xl font-black">Choose Date</h3>
 
               <p className="mt-1 text-sm text-white/60">
-                Today is selected by default. Previous dates are on the left,
-                and future dates continue to July 19, 2026.
+                Click a date to show only that day. Today is selected by
+                default.
               </p>
             </div>
           </div>
 
           <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
             {dateKeys.map((dateKey) => {
-              const isSelected = selectedDateKey === dateKey;
+              const isSelected = dateModeIsActive && selectedDateKey === dateKey;
               const isPast = dateKey < todayKey;
               const isToday = dateKey === todayKey;
               const isTomorrow =
@@ -440,16 +498,14 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                   key={dateKey}
                   ref={dateKey === todayKey ? todayTileRef : null}
                   type="button"
-                  onClick={() => setSelectedDateKey(dateKey)}
+                  onClick={() => selectDate(dateKey)}
                   className={`min-w-[135px] rounded-2xl border p-4 text-left transition ${
                     isSelected
                       ? "border-green-400 bg-green-400 text-slate-950"
                       : "border-white/10 bg-black/20 text-white hover:bg-white/10"
                   }`}
                 >
-                  <p className="text-lg font-black">
-                    {formatDateTile(dateKey)}
-                  </p>
+                  <p className="text-lg font-black">{formatDateTile(dateKey)}</p>
 
                   <p
                     className={`mt-1 text-xs font-bold ${
@@ -489,34 +545,33 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
         </div>
       </div>
 
-    
-    <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
-  <div className="flex flex-wrap items-center justify-between gap-4">
-    <div>
-      <h3 className="font-black text-green-300">
-        {selectedDateKey ? formatDateTitle(selectedDateKey) : "Selected Date"}
-      </h3>
+      <div className="mb-5 rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h3 className="font-black text-green-300">
+              {getCurrentHeading()}
+            </h3>
 
-      <p className="mt-1 text-sm text-white/60">
-        Showing matches for the selected date.
-      </p>
-    </div>
+            <p className="mt-1 text-sm text-white/60">
+              {getCurrentDescription()}
+            </p>
+          </div>
 
-    {selectedDateIsPast && (
-      <div className="rounded-xl bg-black/20 px-5 py-3 text-center">
-        <p className="text-xs font-bold text-white/50">
-          Total points this day
-        </p>
+          {dateModeIsActive && selectedDateIsPast && (
+            <div className="rounded-xl bg-black/20 px-5 py-3 text-center">
+              <p className="text-xs font-bold text-white/50">
+                Total points this day
+              </p>
 
-        <p className="mt-1 text-2xl font-black text-green-300">
-          {selectedDateTotalPoints}
-        </p>
+              <p className="mt-1 text-2xl font-black text-green-300">
+                {selectedDateTotalPoints}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
-    )}
-  </div>
-</div>
 
-      {selectedDateMatches.length === 0 ? (
+      {selectedMatches.length === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-white/10 p-8 text-center">
           <h3 className="text-xl font-black">No matches found</h3>
 
@@ -526,7 +581,7 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
         </div>
       ) : (
         <div className="grid gap-4">
-          {selectedDateMatches.map((match) => {
+          {selectedMatches.map((match) => {
             const kickoff = new Date(match.kickoffAt);
 
             const locked =
@@ -736,8 +791,6 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
           })}
         </div>
       )}
-
-      
     </section>
   );
 }
