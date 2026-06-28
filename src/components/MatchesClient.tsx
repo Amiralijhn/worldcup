@@ -762,7 +762,7 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
 
                     {knockoutMatch && (
                       <p className="mt-2 text-xs text-white/50">
-                        Knockout winner prediction can add +2 points.
+                        Knockout winner prediction can add +1 points.
                       </p>
                     )}
                   </div>
@@ -822,7 +822,7 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                     </p>
 
                     <p className="mt-1 text-xs text-white/60">
-                      Whose would advance after 90 minutes or 120 minutes or penalty shootout? This can add +2 points if you get it right!
+                      Whose would advance after 90 minutes or 120 minutes or penalty shootout? This can add +1 points if you get it right!
                     </p>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">

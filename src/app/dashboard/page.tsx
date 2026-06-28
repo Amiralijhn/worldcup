@@ -97,17 +97,19 @@ export default async function DashboardPage() {
             <section className="mb-6 rounded-3xl border border-red-400/40 bg-red-500/15 p-5 shadow-xl">
   <div className="flex flex-wrap items-start justify-between gap-4">
     <div>
-      <p className="text-sm font-black uppercase tracking-wide text-red-300">
-        Update Note
+      <p className="font-bold text-sm font-black uppercase tracking-wide text-red-300">
+        !!! Update Note !!!
       </p>
 
       <h2 className="mt-1 text-2xl font-black text-white">
         Knockout Match Prediction Update
       </h2>
 
-      <p className="mt-2 max-w-3xl text-sm leading-6 text-white/80">
-        For knockout matches, you must now predict both the 90-minute score and
-        the team you think will advance after extra time or penalties.
+      <p className="font-bold mt-2 max-w-3xl text-sm leading-6 text-white/80">
+        For knockout matches, you must now predict both the legal time score and
+        the team you think will advance after legal time or penalties.
+        your game score prediction is for the 90-minutes or 120-minutes if 
+        the game had extra time . 
       </p>
     </div>
 
@@ -117,16 +119,16 @@ export default async function DashboardPage() {
   </div>
 
   <ul className="mt-4 grid gap-2 text-sm text-white/80 sm:grid-cols-3">
-    <li className="rounded-xl border border-red-300/20 bg-red-400/10 p-3">
-      Knockout winner prediction added
+    <li className="font-bold rounded-xl border border-red-300/20 bg-red-400/10 p-3">
+      predict the score after 90 minutes or 120 minutes . 
     </li>
 
-    <li className="rounded-xl border border-red-300/20 bg-red-400/10 p-3">
-      Correct advancing team gives +2 points
+    <li className="font-bold rounded-xl border border-red-300/20 bg-red-400/10 p-3">
+      Correct advancing team gives +1 points
     </li>
 
-    <li className="rounded-xl border border-red-300/20 bg-red-400/10 p-3">
-      Winner selection uses radio buttons
+    <li className="font-bold rounded-xl border border-red-300/20 bg-red-400/10 p-3">
+      Select advancing team using radio buttons after selecting the score.
     </li>
   </ul>
 </section>
