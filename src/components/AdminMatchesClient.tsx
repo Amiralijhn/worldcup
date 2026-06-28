@@ -168,8 +168,7 @@ function selectedDateDefaultTime(dateKey: string) {
 
 function isMatchToday(kickoffAt: string) {
   return (
-    getTorontoDateKey(new Date(kickoffAt)) ===
-    getTorontoDateKey(new Date())
+    getTorontoDateKey(new Date(kickoffAt)) === getTorontoDateKey(new Date())
   );
 }
 
@@ -568,12 +567,14 @@ export default function AdminMatchesClient({
 
   return (
     <section>
-      <div className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-5">
+      <div className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black">Admin Match Management</h1>
+            <h1 className="text-2xl font-black sm:text-3xl">
+              Admin Match Management
+            </h1>
 
-            <p className="mt-2 text-white/60">
+            <p className="mt-2 text-sm text-white/60 sm:text-base">
               Add, edit, delete matches, update final results, and review user
               predictions.
             </p>
@@ -737,15 +738,15 @@ export default function AdminMatchesClient({
                   onClick={() =>
                     setSelectedMatchId(isSelected ? null : match.id)
                   }
-                  className="w-full p-5 text-left transition hover:bg-white/5"
+                  className="w-full p-4 text-left transition hover:bg-white/5 sm:p-5"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-bold text-green-300">
                         Match {match.matchNumber} · {match.stage}
                       </p>
 
-                      <h2 className="mt-1 text-2xl font-black">
+                      <h2 className="mt-1 break-words text-xl font-black sm:text-2xl">
                         {match.team1} vs {match.team2}
                       </h2>
 
@@ -794,7 +795,7 @@ export default function AdminMatchesClient({
                 </button>
 
                 {isSelected && (
-                  <div className="grid gap-5 border-t border-white/10 p-5">
+                  <div className="grid gap-5 border-t border-white/10 p-4 sm:p-5">
                     <FinalResultForm
                       match={match}
                       onSave={updateFinalResult}
@@ -814,17 +815,27 @@ export default function AdminMatchesClient({
                           No users have submitted predictions for this match.
                         </p>
                       ) : (
-                        <div className="mt-4 overflow-x-auto">
-                          <table className="w-full min-w-[900px] text-left text-sm">
+                        <div className="mt-4 overflow-x-auto rounded-2xl">
+                          <table className="w-full min-w-[720px] text-left text-sm">
                             <thead className="border-b border-white/10 text-white/50">
                               <tr>
-                                <th className="p-3">Player</th>
-                                <th className="p-3">Username</th>
-                                <th className="p-3">Predicted Score</th>
-                                <th className="p-3">Predicted Winner</th>
-                                <th className="p-3">Current Points</th>
-                                <th className="p-3">New Points</th>
-                                <th className="p-3">Save</th>
+                                <th className="whitespace-nowrap p-3">
+                                  Player
+                                </th>
+                                <th className="whitespace-nowrap p-3">
+                                  Username
+                                </th>
+                                <th className="whitespace-nowrap p-3">
+                                  Predicted Score
+                                </th>
+                                <th className="whitespace-nowrap p-3">
+                                  Winner
+                                </th>
+                                <th className="whitespace-nowrap p-3">
+                                  Current
+                                </th>
+                                <th className="whitespace-nowrap p-3">New</th>
+                                <th className="whitespace-nowrap p-3">Save</th>
                               </tr>
                             </thead>
 
@@ -904,7 +915,7 @@ function AddMatchForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-3xl border border-orange-400/30 bg-orange-500/10 p-5"
+      className="rounded-3xl border border-orange-400/30 bg-orange-500/10 p-4 sm:p-5"
     >
       <h2 className="text-xl font-black text-orange-300">
         Add Match on {formatDateTile(selectedDateKey)}
@@ -1218,11 +1229,15 @@ function PredictionRow({
 
   return (
     <tr className="border-b border-white/10">
-      <td className="p-3 font-bold">{prediction.user.displayName}</td>
+      <td className="whitespace-nowrap p-3 font-bold">
+        {prediction.user.displayName}
+      </td>
 
-      <td className="p-3 text-white/60">{prediction.user.username}</td>
+      <td className="whitespace-nowrap p-3 text-white/60">
+        {prediction.user.username}
+      </td>
 
-      <td className="p-3">
+      <td className="whitespace-nowrap p-3">
         <div className="flex items-center gap-2">
           <input
             type="number"
@@ -1248,17 +1263,17 @@ function PredictionRow({
         </div>
       </td>
 
-      <td className="p-3 text-white/70">
+      <td className="whitespace-nowrap p-3 text-white/70">
         {isKnockout
           ? getWinnerLabel(prediction.predWinner, team1, team2)
           : "-"}
       </td>
 
-      <td className="p-3 font-bold text-green-300">
+      <td className="whitespace-nowrap p-3 font-bold text-green-300">
         {prediction.points ?? 0}
       </td>
 
-      <td className="p-3">
+      <td className="whitespace-nowrap p-3">
         <input
           type="number"
           value={points}
@@ -1267,7 +1282,7 @@ function PredictionRow({
         />
       </td>
 
-      <td className="p-3">
+      <td className="whitespace-nowrap p-3">
         <button
           type="button"
           disabled={saving}

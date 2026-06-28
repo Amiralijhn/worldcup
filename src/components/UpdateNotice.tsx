@@ -15,13 +15,13 @@ export default function UpdateNotice() {
     <div className="mb-6 grid gap-4">
       {showKnockoutUpdate && (
         <section className="rounded-3xl border border-red-400/40 bg-red-500/15 p-5 shadow-xl">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-black uppercase tracking-wide text-red-300">
                 !!! Update Note !!!
               </p>
 
-              <h2 className="mt-1 text-2xl font-black text-white">
+              <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">
                 Knockout Match Prediction Update - MUST Choose the Winner
               </h2>
 
@@ -33,7 +33,7 @@ export default function UpdateNotice() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">
               <span className="rounded-full bg-red-500 px-3 py-1 text-xs font-black text-white">
                 Attention
               </span>
@@ -67,13 +67,13 @@ export default function UpdateNotice() {
 
       {showMatchFeaturesUpdate && (
         <section className="rounded-3xl border border-orange-400/40 bg-orange-500/15 p-5 shadow-xl">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-black uppercase tracking-wide text-orange-300">
                 Update Note
               </p>
 
-              <h2 className="mt-1 text-2xl font-black text-white">
+              <h2 className="mt-1 text-xl font-black text-white sm:text-2xl">
                 New Match Page Features
               </h2>
 
@@ -87,7 +87,7 @@ export default function UpdateNotice() {
             <button
               type="button"
               onClick={() => setShowMatchFeaturesUpdate(false)}
-              className="rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs font-black text-white transition hover:bg-white/10"
+              className="shrink-0 rounded-full border border-white/20 bg-black/30 px-3 py-1 text-xs font-black text-white transition hover:bg-white/10"
             >
               Close
             </button>
