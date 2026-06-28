@@ -364,7 +364,7 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
           prediction: {
             predTeam1Score: match.prediction?.predTeam1Score ?? 0,
             predTeam2Score: match.prediction?.predTeam2Score ?? 0,
-            predWinner: value || null,
+            predWinner: value,
             points: match.prediction?.points ?? null,
           },
         };
@@ -826,18 +826,55 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                       think will advance after extra time or penalties.
                     </p>
 
-                    <select
-                      disabled={locked}
-                      value={match.prediction?.predWinner ?? ""}
-                      onChange={(event) =>
-                        updateLocalPredWinner(match.id, event.target.value)
-                      }
-                      className="mt-3 w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none disabled:opacity-40"
-                    >
-                      <option value="">Select winner</option>
-                      <option value="TEAM1">{match.team1}</option>
-                      <option value="TEAM2">{match.team2}</option>
-                    </select>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <label
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition ${
+                          match.prediction?.predWinner === "TEAM1"
+                            ? "border-orange-400 bg-orange-400/20"
+                            : "border-white/10 bg-black/20 hover:bg-white/10"
+                        } ${locked ? "cursor-not-allowed opacity-50" : ""}`}
+                      >
+                        <input
+                          type="radio"
+                          name={`winner-${match.id}`}
+                          value="TEAM1"
+                          disabled={locked}
+                          checked={match.prediction?.predWinner === "TEAM1"}
+                          onChange={(event) =>
+                            updateLocalPredWinner(match.id, event.target.value)
+                          }
+                          className="h-4 w-4"
+                        />
+
+                        <span className="font-black text-white">
+                          {match.team1}
+                        </span>
+                      </label>
+
+                      <label
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition ${
+                          match.prediction?.predWinner === "TEAM2"
+                            ? "border-orange-400 bg-orange-400/20"
+                            : "border-white/10 bg-black/20 hover:bg-white/10"
+                        } ${locked ? "cursor-not-allowed opacity-50" : ""}`}
+                      >
+                        <input
+                          type="radio"
+                          name={`winner-${match.id}`}
+                          value="TEAM2"
+                          disabled={locked}
+                          checked={match.prediction?.predWinner === "TEAM2"}
+                          onChange={(event) =>
+                            updateLocalPredWinner(match.id, event.target.value)
+                          }
+                          className="h-4 w-4"
+                        />
+
+                        <span className="font-black text-white">
+                          {match.team2}
+                        </span>
+                      </label>
+                    </div>
                   </div>
                 )}
 
