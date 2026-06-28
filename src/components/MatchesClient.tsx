@@ -822,8 +822,7 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                     </p>
 
                     <p className="mt-1 text-xs text-white/60">
-                      If the match is tied after 90 minutes, choose who you
-                      think will advance after extra time or penalties.
+                      Whose would advance after 90 minutes or 120 minutes or penalty shootout? This can add +2 points if you get it right!
                     </p>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
