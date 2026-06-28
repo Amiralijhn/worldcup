@@ -102,11 +102,11 @@ export default async function DashboardPage() {
       </p>
 
       <h2 className="mt-1 text-2xl font-black text-white">
-        Knockout Match Prediction Update
+        Knockout Match Prediction Update - MUST Choose the Winner
       </h2>
 
       <p className="font-bold mt-2 max-w-3xl text-sm leading-6 text-white/80">
-        For knockout matches, you must now predict both the legal time score and
+        For knockout matches, you MUST now predict both the legal time score and
         the team you think will advance after legal time or penalties.
         your game score prediction is for the 90-minutes or 120-minutes if 
         the game had extra time . 
