@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { isKnockoutStage } from "@/lib/scoring";
 
 export async function POST(request: Request) {
   try {
@@ -19,6 +20,11 @@ export async function POST(request: Request) {
     const predTeam1Score = Number(body.predTeam1Score);
     const predTeam2Score = Number(body.predTeam2Score);
 
+    const predWinner =
+      typeof body.predWinner === "string" && body.predWinner.trim()
+        ? body.predWinner.trim()
+        : null;
+
     if (
       !Number.isInteger(matchId) ||
       !Number.isInteger(predTeam1Score) ||
@@ -33,7 +39,9 @@ export async function POST(request: Request) {
     }
 
     const match = await prisma.match.findUnique({
-      where: { id: matchId },
+      where: {
+        id: matchId,
+      },
     });
 
     if (!match) {
@@ -50,6 +58,18 @@ export async function POST(request: Request) {
       );
     }
 
+    if (isKnockoutStage(match.stage)) {
+      if (predWinner !== "TEAM1" && predWinner !== "TEAM2") {
+        return NextResponse.json(
+          {
+            error:
+              "For knockout matches, please select the team you think will advance.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const prediction = await prisma.prediction.upsert({
       where: {
         userId_matchId: {
@@ -60,12 +80,14 @@ export async function POST(request: Request) {
       update: {
         predTeam1Score,
         predTeam2Score,
+        predWinner: isKnockoutStage(match.stage) ? predWinner : null,
       },
       create: {
         userId: user.id,
         matchId,
         predTeam1Score,
         predTeam2Score,
+        predWinner: isKnockoutStage(match.stage) ? predWinner : null,
       },
     });
 

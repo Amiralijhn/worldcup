@@ -11,10 +11,12 @@ type MatchItem = {
   kickoffAt: string;
   actualTeam1Score: number | null;
   actualTeam2Score: number | null;
+  actualWinner: string | null;
   status: string;
   prediction: {
     predTeam1Score: number;
     predTeam2Score: number;
+    predWinner: string | null;
     points: number | null;
   } | null;
 };
@@ -24,6 +26,7 @@ type OtherPlayerPrediction = {
   playerName: string;
   predTeam1Score: number;
   predTeam2Score: number;
+  predWinner?: string | null;
   points: number;
 };
 
@@ -42,6 +45,30 @@ const stageFilters = [
   { label: "Playoff", value: "Playoff" },
   { label: "Final", value: "Final" },
 ];
+
+const knockoutStages = [
+  "1/32",
+  "1/16",
+  "1/8",
+  "1/4",
+  "1/2 Final",
+  "Playoff",
+  "Final",
+];
+
+function isKnockoutStage(stage: string) {
+  return knockoutStages.includes(stage);
+}
+
+function getWinnerLabel(
+  winner: string | null | undefined,
+  team1: string,
+  team2: string
+) {
+  if (winner === "TEAM1") return team1;
+  if (winner === "TEAM2") return team2;
+  return "Not selected";
+}
 
 function getTorontoDateParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -216,28 +243,34 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
   }, []);
 
   const selectedMatches = useMemo(() => {
-    return items.filter((match) => {
-      const matchDateKey = getTorontoDateKey(new Date(match.kickoffAt));
+    return items
+      .filter((match) => {
+        const matchDateKey = getTorontoDateKey(new Date(match.kickoffAt));
 
-      const searchMatch =
-        `${match.matchNumber} ${match.team1} ${match.team2}`
-          .toLowerCase()
-          .includes(search.trim().toLowerCase());
+        const searchMatch =
+          `${match.matchNumber} ${match.team1} ${match.team2}`
+            .toLowerCase()
+            .includes(search.trim().toLowerCase());
 
-      if (!searchMatch) {
-        return false;
-      }
-
-      if (selectedStageFilter !== null) {
-        if (selectedStageFilter === "All") {
-          return true;
+        if (!searchMatch) {
+          return false;
         }
 
-        return match.stage === selectedStageFilter;
-      }
+        if (selectedStageFilter !== null) {
+          if (selectedStageFilter === "All") {
+            return true;
+          }
 
-      return matchDateKey === selectedDateKey;
-    });
+          return match.stage === selectedStageFilter;
+        }
+
+        return matchDateKey === selectedDateKey;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.kickoffAt).getTime() -
+          new Date(b.kickoffAt).getTime()
+      );
   }, [items, selectedDateKey, selectedStageFilter, search]);
 
   const selectedDateIsPast = selectedDateKey < todayKey;
@@ -267,7 +300,9 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
 
   function getCurrentHeading() {
     if (selectedStageFilter !== null) {
-      const filter = stageFilters.find((stage) => stage.value === selectedStageFilter);
+      const filter = stageFilters.find(
+        (stage) => stage.value === selectedStageFilter
+      );
 
       return filter?.label || "Matches";
     }
@@ -309,6 +344,27 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
               field === "predTeam2Score"
                 ? value
                 : match.prediction?.predTeam2Score ?? 0,
+            predWinner: match.prediction?.predWinner ?? null,
+            points: match.prediction?.points ?? null,
+          },
+        };
+      })
+    );
+  }
+
+  function updateLocalPredWinner(matchId: number, value: string) {
+    setItems((current) =>
+      current.map((match) => {
+        if (match.id !== matchId) {
+          return match;
+        }
+
+        return {
+          ...match,
+          prediction: {
+            predTeam1Score: match.prediction?.predTeam1Score ?? 0,
+            predTeam2Score: match.prediction?.predTeam2Score ?? 0,
+            predWinner: value || null,
             points: match.prediction?.points ?? null,
           },
         };
@@ -323,6 +379,12 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
       return;
     }
 
+    if (isKnockoutStage(match.stage) && !match.prediction.predWinner) {
+      setMessageType("error");
+      setMessage("Please select the team you think will advance.");
+      return;
+    }
+
     try {
       const response = await fetch("/api/predictions", {
         method: "POST",
@@ -333,6 +395,9 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
           matchId: match.id,
           predTeam1Score: match.prediction.predTeam1Score,
           predTeam2Score: match.prediction.predTeam2Score,
+          predWinner: isKnockoutStage(match.stage)
+            ? match.prediction.predWinner
+            : null,
         }),
       });
 
@@ -594,6 +659,8 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
               match.actualTeam1Score !== null &&
               match.actualTeam2Score !== null;
 
+            const knockoutMatch = isKnockoutStage(match.stage);
+
             return (
               <div
                 key={match.id}
@@ -648,6 +715,19 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                         ? `${match.actualTeam1Score} - ${match.actualTeam2Score}`
                         : "Not added yet"}
                     </p>
+
+                    {knockoutMatch && (
+                      <p className="mt-2 text-sm text-white/60">
+                        Winner:{" "}
+                        <span className="font-bold text-white">
+                          {getWinnerLabel(
+                            match.actualWinner,
+                            match.team1,
+                            match.team2
+                          )}
+                        </span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="rounded-xl bg-black/20 p-4">
@@ -658,6 +738,19 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                         ? `${match.prediction.predTeam1Score} - ${match.prediction.predTeam2Score}`
                         : "No prediction"}
                     </p>
+
+                    {knockoutMatch && (
+                      <p className="mt-2 text-sm text-white/60">
+                        Winner:{" "}
+                        <span className="font-bold text-white">
+                          {getWinnerLabel(
+                            match.prediction?.predWinner,
+                            match.team1,
+                            match.team2
+                          )}
+                        </span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="rounded-xl bg-black/20 p-4">
@@ -666,6 +759,12 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                     <p className="mt-1 text-xl font-black text-green-300">
                       {hasResult ? match.prediction?.points ?? 0 : "Pending"}
                     </p>
+
+                    {knockoutMatch && (
+                      <p className="mt-2 text-xs text-white/50">
+                        Knockout winner prediction can add +2 points.
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -716,6 +815,32 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                   </button>
                 </div>
 
+                {knockoutMatch && (
+                  <div className="mt-4 rounded-2xl border border-orange-400/20 bg-orange-500/10 p-4">
+                    <p className="text-sm font-bold text-orange-300">
+                      Knockout Winner Prediction
+                    </p>
+
+                    <p className="mt-1 text-xs text-white/60">
+                      If the match is tied after 90 minutes, choose who you
+                      think will advance after extra time or penalties.
+                    </p>
+
+                    <select
+                      disabled={locked}
+                      value={match.prediction?.predWinner ?? ""}
+                      onChange={(event) =>
+                        updateLocalPredWinner(match.id, event.target.value)
+                      }
+                      className="mt-3 w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none disabled:opacity-40"
+                    >
+                      <option value="">Select winner</option>
+                      <option value="TEAM1">{match.team1}</option>
+                      <option value="TEAM2">{match.team2}</option>
+                    </select>
+                  </div>
+                )}
+
                 {locked && hasResult && (
                   <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
                     <button
@@ -743,11 +868,12 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                           </p>
                         ) : otherPredictions[match.id]?.length ? (
                           <div className="overflow-x-auto">
-                            <table className="w-full min-w-[500px] text-left text-sm">
+                            <table className="w-full min-w-[600px] text-left text-sm">
                               <thead className="border-b border-white/10 text-white/50">
                                 <tr>
                                   <th className="p-3">Player</th>
                                   <th className="p-3">Prediction</th>
+                                  <th className="p-3">Winner</th>
                                   <th className="p-3">Points</th>
                                 </tr>
                               </thead>
@@ -766,6 +892,16 @@ export default function MatchesClient({ matches }: MatchesClientProps) {
                                       <td className="p-3 font-black">
                                         {prediction.predTeam1Score} -{" "}
                                         {prediction.predTeam2Score}
+                                      </td>
+
+                                      <td className="p-3 font-bold text-white/80">
+                                        {knockoutMatch
+                                          ? getWinnerLabel(
+                                              prediction.predWinner,
+                                              match.team1,
+                                              match.team2
+                                            )
+                                          : "-"}
                                       </td>
 
                                       <td className="p-3 font-black text-green-300">

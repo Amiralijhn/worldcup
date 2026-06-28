@@ -72,6 +72,7 @@ export async function GET(
         playerName: prediction.user.displayName,
         predTeam1Score: prediction.predTeam1Score,
         predTeam2Score: prediction.predTeam2Score,
+        predWinner: prediction.predWinner,
         points: prediction.points ?? 0,
       }))
       .sort(
@@ -86,8 +87,10 @@ export async function GET(
         matchNumber: match.matchNumber,
         team1: match.team1,
         team2: match.team2,
+        stage: match.stage,
         actualTeam1Score: match.actualTeam1Score,
         actualTeam2Score: match.actualTeam2Score,
+        actualWinner: match.actualWinner,
       },
       predictions,
     });

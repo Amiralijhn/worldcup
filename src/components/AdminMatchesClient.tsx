@@ -6,6 +6,7 @@ type AdminPrediction = {
   id: number;
   predTeam1Score: number;
   predTeam2Score: number;
+  predWinner: string | null;
   points: number | null;
   user: {
     id: number;
@@ -24,6 +25,7 @@ type AdminMatch = {
   status: string;
   actualTeam1Score: number | null;
   actualTeam2Score: number | null;
+  actualWinner: string | null;
   predictions: AdminPrediction[];
 };
 
@@ -33,6 +35,9 @@ type AdminMatchesClientProps = {
 
 type PredictionRowProps = {
   prediction: AdminPrediction;
+  team1: string;
+  team2: string;
+  isKnockout: boolean;
   onSave: (
     predictionId: number,
     predTeam1Score: number,
@@ -52,6 +57,30 @@ const stageFilters = [
   { label: "Playoff", value: "Playoff" },
   { label: "Final", value: "Final" },
 ];
+
+const knockoutStages = [
+  "1/32",
+  "1/16",
+  "1/8",
+  "1/4",
+  "1/2 Final",
+  "Playoff",
+  "Final",
+];
+
+function isKnockoutStage(stage: string) {
+  return knockoutStages.includes(stage);
+}
+
+function getWinnerLabel(
+  winner: string | null | undefined,
+  team1: string,
+  team2: string
+) {
+  if (winner === "TEAM1") return team1;
+  if (winner === "TEAM2") return team2;
+  return "Not selected";
+}
 
 function getTorontoDateParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -155,11 +184,11 @@ export default function AdminMatchesClient({
   matches,
 }: AdminMatchesClientProps) {
   const [items, setItems] = useState(matches);
-  const [selectedMatchId, setSelectedMatchId] =
-    useState<number | null>(null);
+  const [selectedMatchId, setSelectedMatchId] = useState<number | null>(null);
 
-  const [selectedStageFilter, setSelectedStageFilter] =
-    useState<string | null>(null);
+  const [selectedStageFilter, setSelectedStageFilter] = useState<string | null>(
+    null
+  );
 
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
@@ -232,28 +261,34 @@ export default function AdminMatchesClient({
   }
 
   const selectedMatches = useMemo(() => {
-    return items.filter((match) => {
-      const matchDateKey = getTorontoDateKey(new Date(match.kickoffAt));
+    return items
+      .filter((match) => {
+        const matchDateKey = getTorontoDateKey(new Date(match.kickoffAt));
 
-      const searchMatches =
-        `${match.matchNumber} ${match.team1} ${match.team2}`
-          .toLowerCase()
-          .includes(search.trim().toLowerCase());
+        const searchMatches =
+          `${match.matchNumber} ${match.team1} ${match.team2}`
+            .toLowerCase()
+            .includes(search.trim().toLowerCase());
 
-      if (!searchMatches) {
-        return false;
-      }
-
-      if (selectedStageFilter !== null) {
-        if (selectedStageFilter === "All") {
-          return true;
+        if (!searchMatches) {
+          return false;
         }
 
-        return match.stage === selectedStageFilter;
-      }
+        if (selectedStageFilter !== null) {
+          if (selectedStageFilter === "All") {
+            return true;
+          }
 
-      return matchDateKey === selectedDateKey;
-    });
+          return match.stage === selectedStageFilter;
+        }
+
+        return matchDateKey === selectedDateKey;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.kickoffAt).getTime() -
+          new Date(b.kickoffAt).getTime()
+      );
   }, [items, search, selectedDateKey, selectedStageFilter]);
 
   function getDateMatchCount(dateKey: string) {
@@ -343,7 +378,8 @@ export default function AdminMatchesClient({
   async function updateFinalResult(
     matchId: number,
     actualTeam1Score: number,
-    actualTeam2Score: number
+    actualTeam2Score: number,
+    actualWinner: string | null
   ) {
     setMessage("");
 
@@ -357,6 +393,7 @@ export default function AdminMatchesClient({
           matchId,
           actualTeam1Score,
           actualTeam2Score,
+          actualWinner,
         }),
       });
 
@@ -375,6 +412,7 @@ export default function AdminMatchesClient({
                 ...match,
                 actualTeam1Score: data.match.actualTeam1Score,
                 actualTeam2Score: data.match.actualTeam2Score,
+                actualWinner: data.match.actualWinner,
                 status: data.match.status,
               }
             : match
@@ -423,6 +461,7 @@ export default function AdminMatchesClient({
           {
             ...data.match,
             kickoffAt: data.match.kickoffAt,
+            actualWinner: data.match.actualWinner ?? null,
             predictions: [],
           },
         ].sort((a, b) => a.matchNumber - b.matchNumber)
@@ -663,6 +702,7 @@ export default function AdminMatchesClient({
 
       {dateModeIsActive && (
         <AddMatchForm
+          key={selectedDateKey}
           selectedDateKey={selectedDateKey}
           onCreate={createMatch}
         />
@@ -685,6 +725,7 @@ export default function AdminMatchesClient({
             const hasResult =
               match.actualTeam1Score !== null &&
               match.actualTeam2Score !== null;
+            const knockoutMatch = isKnockoutStage(match.stage);
 
             return (
               <div
@@ -730,6 +771,20 @@ export default function AdminMatchesClient({
                         {match.predictions.length} submitted prediction
                         {match.predictions.length === 1 ? "" : "s"}
                       </p>
+
+                      {hasResult && (
+                        <p className="mt-2 text-sm text-white/50">
+                          Final: {match.actualTeam1Score} -{" "}
+                          {match.actualTeam2Score}
+                          {knockoutMatch
+                            ? ` · Winner: ${getWinnerLabel(
+                                match.actualWinner,
+                                match.team1,
+                                match.team2
+                              )}`
+                            : ""}
+                        </p>
+                      )}
                     </div>
 
                     <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold">
@@ -752,9 +807,7 @@ export default function AdminMatchesClient({
                     />
 
                     <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <h3 className="text-xl font-black">
-                        User Predictions
-                      </h3>
+                      <h3 className="text-xl font-black">User Predictions</h3>
 
                       {match.predictions.length === 0 ? (
                         <p className="mt-3 text-sm text-white/60">
@@ -762,12 +815,13 @@ export default function AdminMatchesClient({
                         </p>
                       ) : (
                         <div className="mt-4 overflow-x-auto">
-                          <table className="w-full min-w-[760px] text-left text-sm">
+                          <table className="w-full min-w-[900px] text-left text-sm">
                             <thead className="border-b border-white/10 text-white/50">
                               <tr>
                                 <th className="p-3">Player</th>
                                 <th className="p-3">Username</th>
                                 <th className="p-3">Predicted Score</th>
+                                <th className="p-3">Predicted Winner</th>
                                 <th className="p-3">Current Points</th>
                                 <th className="p-3">New Points</th>
                                 <th className="p-3">Save</th>
@@ -779,6 +833,9 @@ export default function AdminMatchesClient({
                                 <PredictionRow
                                   key={prediction.id}
                                   prediction={prediction}
+                                  team1={match.team1}
+                                  team2={match.team2}
+                                  isKnockout={knockoutMatch}
                                   onSave={updatePrediction}
                                 />
                               ))}
@@ -819,10 +876,6 @@ function AddMatchForm({
     selectedDateDefaultTime(selectedDateKey)
   );
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    setKickoffAt(selectedDateDefaultTime(selectedDateKey));
-  }, [selectedDateKey]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -922,18 +975,27 @@ function FinalResultForm({
   onSave: (
     matchId: number,
     actualTeam1Score: number,
-    actualTeam2Score: number
+    actualTeam2Score: number,
+    actualWinner: string | null
   ) => Promise<void>;
 }) {
   const [team1Score, setTeam1Score] = useState(match.actualTeam1Score ?? 0);
   const [team2Score, setTeam2Score] = useState(match.actualTeam2Score ?? 0);
+  const [actualWinner, setActualWinner] = useState(match.actualWinner ?? "");
   const [saving, setSaving] = useState(false);
+
+  const knockoutMatch = isKnockoutStage(match.stage);
 
   async function handleSave() {
     setSaving(true);
 
     try {
-      await onSave(match.id, team1Score, team2Score);
+      await onSave(
+        match.id,
+        team1Score,
+        team2Score,
+        knockoutMatch ? actualWinner : null
+      );
     } finally {
       setSaving(false);
     }
@@ -965,16 +1027,34 @@ function FinalResultForm({
         />
 
         <span className="font-bold">{match.team2}</span>
-
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded-lg bg-green-400 px-4 py-2 font-black text-slate-950 transition hover:bg-green-300 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save Result"}
-        </button>
       </div>
+
+      {knockoutMatch && (
+        <div className="mt-4">
+          <p className="mb-2 text-sm font-bold text-white/60">
+            Team that advanced/won after 120 minutes or penalties
+          </p>
+
+          <select
+            value={actualWinner}
+            onChange={(event) => setActualWinner(event.target.value)}
+            className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
+          >
+            <option value="">Select winner</option>
+            <option value="TEAM1">{match.team1}</option>
+            <option value="TEAM2">{match.team2}</option>
+          </select>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={saving}
+        className="mt-4 rounded-lg bg-green-400 px-4 py-2 font-black text-slate-950 transition hover:bg-green-300 disabled:opacity-50"
+      >
+        {saving ? "Saving..." : "Save Result"}
+      </button>
     </div>
   );
 }
@@ -1103,7 +1183,13 @@ function EditMatchForm({
   );
 }
 
-function PredictionRow({ prediction, onSave }: PredictionRowProps) {
+function PredictionRow({
+  prediction,
+  team1,
+  team2,
+  isKnockout,
+  onSave,
+}: PredictionRowProps) {
   const [predTeam1Score, setPredTeam1Score] = useState(
     prediction.predTeam1Score
   );
@@ -1160,6 +1246,12 @@ function PredictionRow({ prediction, onSave }: PredictionRowProps) {
             className="w-16 rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-center text-white outline-none"
           />
         </div>
+      </td>
+
+      <td className="p-3 text-white/70">
+        {isKnockout
+          ? getWinnerLabel(prediction.predWinner, team1, team2)
+          : "-"}
       </td>
 
       <td className="p-3 font-bold text-green-300">

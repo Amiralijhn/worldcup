@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
-import { calculatePoints } from "@/lib/scoring";
+import { calculatePoints, isKnockoutStage } from "@/lib/scoring";
 
 export async function PATCH(request: Request) {
   try {
@@ -12,6 +12,11 @@ export async function PATCH(request: Request) {
     const matchId = Number(body.matchId);
     const actualTeam1Score = Number(body.actualTeam1Score);
     const actualTeam2Score = Number(body.actualTeam2Score);
+
+    const actualWinner =
+      typeof body.actualWinner === "string" && body.actualWinner.trim()
+        ? body.actualWinner.trim()
+        : null;
 
     if (!Number.isInteger(matchId)) {
       return NextResponse.json(
@@ -48,6 +53,20 @@ export async function PATCH(request: Request) {
       );
     }
 
+    const knockoutMatch = isKnockoutStage(match.stage);
+
+    if (knockoutMatch) {
+      if (actualWinner !== "TEAM1" && actualWinner !== "TEAM2") {
+        return NextResponse.json(
+          {
+            error:
+              "For knockout matches, please select the team that advanced/won.",
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const updatedMatch = await prisma.match.update({
       where: {
         id: matchId,
@@ -55,6 +74,7 @@ export async function PATCH(request: Request) {
       data: {
         actualTeam1Score,
         actualTeam2Score,
+        actualWinner: knockoutMatch ? actualWinner : null,
         status: "FINISHED",
       },
     });
@@ -65,7 +85,10 @@ export async function PATCH(request: Request) {
           prediction.predTeam1Score,
           prediction.predTeam2Score,
           actualTeam1Score,
-          actualTeam2Score
+          actualTeam2Score,
+          match.stage,
+          prediction.predWinner,
+          knockoutMatch ? actualWinner : null
         );
 
         return prisma.prediction.update({

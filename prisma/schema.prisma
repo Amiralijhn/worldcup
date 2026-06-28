@@ -39,6 +39,7 @@ model Match {
   kickoffAt        DateTime
   actualTeam1Score Int?
   actualTeam2Score Int?
+  actualWinner     String?
   status           MatchStatus @default(UPCOMING)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -52,12 +53,13 @@ model Prediction {
   matchId        Int
   predTeam1Score Int
   predTeam2Score Int
+  predWinner     String?
   points         Int?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+  match Match @relation(fields: [matchId], references: [id])
 
   @@unique([userId, matchId])
 }

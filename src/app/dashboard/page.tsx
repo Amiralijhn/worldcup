@@ -112,9 +112,10 @@ export default async function DashboardPage() {
               </p>
             </div>
 
-            <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-black text-white">
+            {/* <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-black text-white">
               Notice
-            </span>
+            </span> */}
+            
           </div>
 
           <ul className="mt-4 grid gap-2 text-sm text-white/80 sm:grid-cols-3">
