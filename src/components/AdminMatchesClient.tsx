@@ -566,11 +566,11 @@ export default function AdminMatchesClient({
   }
 
   return (
-    <section>
+    <section className="max-w-full overflow-hidden">
       <div className="mb-6 rounded-3xl border border-white/10 bg-white/10 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-black sm:text-3xl">
+          <div className="min-w-0">
+            <h1 className="break-words text-2xl font-black sm:text-3xl">
               Admin Match Management
             </h1>
 
@@ -731,7 +731,7 @@ export default function AdminMatchesClient({
             return (
               <div
                 key={match.id}
-                className="overflow-hidden rounded-3xl border border-white/10 bg-white/10"
+                className="max-w-full overflow-hidden rounded-3xl border border-white/10 bg-white/10"
               >
                 <button
                   type="button"
@@ -795,7 +795,7 @@ export default function AdminMatchesClient({
                 </button>
 
                 {isSelected && (
-                  <div className="grid max-w-full gap-5 overflow-hidden border-t border-white/10 p-4 sm:p-5">
+                  <div className="grid min-w-0 max-w-full gap-5 overflow-hidden border-t border-white/10 p-4 sm:p-5">
                     <FinalResultForm
                       match={match}
                       onSave={updateFinalResult}
@@ -807,7 +807,7 @@ export default function AdminMatchesClient({
                       onDelete={deleteMatch}
                     />
 
-                    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-white/10 bg-black/20 p-4">
                       <h3 className="text-xl font-black">User Predictions</h3>
 
                       {match.predictions.length === 0 ? (
@@ -815,7 +815,7 @@ export default function AdminMatchesClient({
                           No users have submitted predictions for this match.
                         </p>
                       ) : (
-                        <div className="mt-4 overflow-x-auto rounded-2xl">
+                        <div className="mt-4 max-w-full overflow-x-auto rounded-2xl">
                           <table className="w-full min-w-[720px] text-left text-sm">
                             <thead className="border-b border-white/10 text-white/50">
                               <tr>
@@ -1013,11 +1013,11 @@ function FinalResultForm({
   }
 
   return (
-    <div className="w-full max-w-full overflow-hidden rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
+    <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
       <h3 className="text-xl font-black text-green-300">Final Result</h3>
 
-      <div className="mt-4 grid gap-4 sm:hidden">
-        <div>
+      <div className="mt-4 grid min-w-0 max-w-full gap-4 sm:hidden">
+        <div className="min-w-0">
           <label className="mb-2 block break-words text-sm font-bold text-white">
             {match.team1}
           </label>
@@ -1027,11 +1027,11 @@ function FinalResultForm({
             min="0"
             value={team1Score}
             onChange={(event) => setTeam1Score(Number(event.target.value))}
-            className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white outline-none"
+            className="block w-full min-w-0 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white outline-none"
           />
         </div>
 
-        <div>
+        <div className="min-w-0">
           <label className="mb-2 block break-words text-sm font-bold text-white">
             {match.team2}
           </label>
@@ -1041,12 +1041,12 @@ function FinalResultForm({
             min="0"
             value={team2Score}
             onChange={(event) => setTeam2Score(Number(event.target.value))}
-            className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white outline-none"
+            className="block w-full min-w-0 rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white outline-none"
           />
         </div>
       </div>
 
-      <div className="mt-4 hidden items-center gap-3 sm:flex">
+      <div className="mt-4 hidden min-w-0 max-w-full items-center gap-3 sm:flex">
         <span className="min-w-0 flex-1 break-words font-bold">
           {match.team1}
         </span>
@@ -1056,17 +1056,17 @@ function FinalResultForm({
           min="0"
           value={team1Score}
           onChange={(event) => setTeam1Score(Number(event.target.value))}
-          className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
+          className="w-20 shrink-0 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
         />
 
-        <span className="font-black">-</span>
+        <span className="shrink-0 font-black">-</span>
 
         <input
           type="number"
           min="0"
           value={team2Score}
           onChange={(event) => setTeam2Score(Number(event.target.value))}
-          className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
+          className="w-20 shrink-0 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
         />
 
         <span className="min-w-0 flex-1 break-words font-bold">
@@ -1075,7 +1075,7 @@ function FinalResultForm({
       </div>
 
       {knockoutMatch && (
-        <div className="mt-4 max-w-full overflow-hidden">
+        <div className="mt-4 min-w-0 max-w-full overflow-hidden">
           <p className="mb-2 break-words text-sm font-bold leading-5 text-white/60">
             Team that advanced/won after 120 minutes or penalties
           </p>
@@ -1083,7 +1083,7 @@ function FinalResultForm({
           <select
             value={actualWinner}
             onChange={(event) => setActualWinner(event.target.value)}
-            className="w-full max-w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
+            className="block w-full min-w-0 max-w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
           >
             <option value="">Select winner</option>
             <option value="TEAM1">{match.team1}</option>
@@ -1096,7 +1096,7 @@ function FinalResultForm({
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className="mt-4 w-full rounded-xl bg-green-400 px-4 py-3 text-center font-black text-slate-950 transition hover:bg-green-300 disabled:opacity-50 sm:w-auto"
+        className="mt-4 block w-full max-w-full rounded-xl bg-green-400 px-4 py-3 text-center font-black text-slate-950 transition hover:bg-green-300 disabled:opacity-50 sm:w-auto"
       >
         {saving ? "Saving..." : "Save Result"}
       </button>
@@ -1159,34 +1159,34 @@ function EditMatchForm({
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+    <div className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-white/10 bg-black/20 p-4">
       <h3 className="text-xl font-black">Edit Match</h3>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-5">
+      <div className="mt-4 grid min-w-0 max-w-full gap-3 md:grid-cols-5">
         <input
           type="number"
           min="1"
           value={matchNumber}
           onChange={(event) => setMatchNumber(Number(event.target.value))}
-          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+          className="w-full min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
         />
 
         <input
           value={team1}
           onChange={(event) => setTeam1(event.target.value)}
-          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+          className="w-full min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
         />
 
         <input
           value={team2}
           onChange={(event) => setTeam2(event.target.value)}
-          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+          className="w-full min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
         />
 
         <select
           value={stage}
           onChange={(event) => setStage(event.target.value)}
-          className="rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-white outline-none"
+          className="w-full min-w-0 rounded-xl border border-white/10 bg-slate-900 px-3 py-3 text-white outline-none"
         >
           {stageFilters
             .filter((item) => item.value !== "All")
@@ -1201,7 +1201,7 @@ function EditMatchForm({
           type="datetime-local"
           value={kickoffAt}
           onChange={(event) => setKickoffAt(event.target.value)}
-          className="rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
+          className="w-full min-w-0 rounded-xl border border-white/10 bg-black/30 px-3 py-3 text-white outline-none"
         />
       </div>
 
