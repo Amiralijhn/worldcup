@@ -795,7 +795,7 @@ export default function AdminMatchesClient({
                 </button>
 
                 {isSelected && (
-                  <div className="grid gap-5 border-t border-white/10 p-4 sm:p-5">
+                  <div className="grid max-w-full gap-5 overflow-hidden border-t border-white/10 p-4 sm:p-5">
                     <FinalResultForm
                       match={match}
                       onSave={updateFinalResult}
@@ -1013,61 +1013,77 @@ function FinalResultForm({
   }
 
   return (
-    <div className="w-full overflow-hidden rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
+    <div className="w-full max-w-full overflow-hidden rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
       <h3 className="text-xl font-black text-green-300">Final Result</h3>
 
-      <div className="mt-4 grid gap-4">
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto_auto_1fr] sm:items-center">
-          <div className="min-w-0">
-            <p className="break-words font-bold">{match.team1}</p>
-          </div>
+      <div className="mt-4 grid gap-4 sm:hidden">
+        <div>
+          <label className="mb-2 block break-words text-sm font-bold text-white">
+            {match.team1}
+          </label>
 
           <input
             type="number"
             min="0"
             value={team1Score}
             onChange={(event) => setTeam1Score(Number(event.target.value))}
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-3 text-center text-white outline-none sm:w-20"
+            className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white outline-none"
           />
+        </div>
 
-          <span className="hidden text-center font-black sm:block">-</span>
+        <div>
+          <label className="mb-2 block break-words text-sm font-bold text-white">
+            {match.team2}
+          </label>
 
           <input
             type="number"
             min="0"
             value={team2Score}
             onChange={(event) => setTeam2Score(Number(event.target.value))}
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-3 text-center text-white outline-none sm:w-20"
+            className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-center text-white outline-none"
           />
-
-          <div className="min-w-0">
-            <p className="break-words font-bold">{match.team2}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 sm:hidden">
-          <div className="rounded-xl bg-black/20 p-3 text-center">
-            <p className="text-xs font-bold text-white/50">{match.team1}</p>
-            <p className="mt-1 text-lg font-black">{team1Score}</p>
-          </div>
-
-          <div className="rounded-xl bg-black/20 p-3 text-center">
-            <p className="text-xs font-bold text-white/50">{match.team2}</p>
-            <p className="mt-1 text-lg font-black">{team2Score}</p>
-          </div>
         </div>
       </div>
 
+      <div className="mt-4 hidden items-center gap-3 sm:flex">
+        <span className="min-w-0 flex-1 break-words font-bold">
+          {match.team1}
+        </span>
+
+        <input
+          type="number"
+          min="0"
+          value={team1Score}
+          onChange={(event) => setTeam1Score(Number(event.target.value))}
+          className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
+        />
+
+        <span className="font-black">-</span>
+
+        <input
+          type="number"
+          min="0"
+          value={team2Score}
+          onChange={(event) => setTeam2Score(Number(event.target.value))}
+          className="w-20 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-center text-white outline-none"
+        />
+
+        <span className="min-w-0 flex-1 break-words font-bold">
+          {match.team2}
+        </span>
+      </div>
+
       {knockoutMatch && (
-        <div className="mt-4">
-          <p className="mb-2 break-words text-sm font-bold text-white/60">
+        <div className="mt-4 max-w-full overflow-hidden">
+          <p className="mb-2 break-words text-sm font-bold leading-5 text-white/60">
             Team that advanced/won after 120 minutes or penalties
           </p>
 
           <select
             value={actualWinner}
             onChange={(event) => setActualWinner(event.target.value)}
-            className="w-full rounded-lg border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
+            className="w-full max-w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none"
           >
             <option value="">Select winner</option>
             <option value="TEAM1">{match.team1}</option>
@@ -1080,7 +1096,7 @@ function FinalResultForm({
         type="button"
         onClick={handleSave}
         disabled={saving}
-        className="mt-4 w-full rounded-lg bg-green-400 px-4 py-3 font-black text-slate-950 transition hover:bg-green-300 disabled:opacity-50 sm:w-auto"
+        className="mt-4 w-full rounded-xl bg-green-400 px-4 py-3 text-center font-black text-slate-950 transition hover:bg-green-300 disabled:opacity-50 sm:w-auto"
       >
         {saving ? "Saving..." : "Save Result"}
       </button>
