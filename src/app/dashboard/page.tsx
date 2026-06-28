@@ -120,15 +120,15 @@ export default async function DashboardPage() {
 
   <ul className="mt-4 grid gap-2 text-sm text-white/80 sm:grid-cols-3">
     <li className="font-bold rounded-xl border border-red-300/20 bg-red-400/10 p-3">
-      predict the score after 90 minutes or 120 minutes . 
+      Your prediction is for the score after 90 minutes or 120 minutes.
     </li>
 
     <li className="font-bold rounded-xl border border-red-300/20 bg-red-400/10 p-3">
-      Correct advancing team gives +1 points
+      Correct prediction of the advancing team gives +1 points
     </li>
 
     <li className="font-bold rounded-xl border border-red-300/20 bg-red-400/10 p-3">
-      Select advancing team using radio buttons after selecting the score.
+      Select advancing team using radio buttons after selecting the score!
     </li>
   </ul>
 </section>
